@@ -284,7 +284,6 @@ function renderCharacters() {
 /** 메뉴의 누적 점수 표시 */
 function renderTotal() {
   const total = store.get(TOTAL_KEY, 0);
-  $('menu-total').hidden = !(total > 0);
   $('menu-total-value').textContent = fmtNum(total);
 }
 
