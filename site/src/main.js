@@ -2,9 +2,12 @@ import { weatherTarget, easeWeather, drawWeatherSky, drawWeatherFront } from './
 import { HISTORY, historicalWindow, historicalStats } from './history.js';
 import { RANGES, SERIES_KEY, toPoints, withLatest, selectWindow, summarize, formatT, formatFor, tickOf } from './window.js';
 import { H, PHYS, buildTrack, sampleAt, step, toKmh } from './track.js';
-import { applyRules } from './rules.js';
+import { applyRules, resultTitle } from './rules.js';
+import { createFeedback } from './feedback.js';
+import { bestKey, staleBestKeys } from './records.js';
+import { shareResult } from './share.js';
+import { LIVE_DATA_URLS, ON_SITE, SHARE_URL } from './config.js';
 
-const DATA_URL = 'data/kospi.json';
 const REFRESH_MS = 5 * 60 * 1000; // 데이터 파일은 1시간마다 바뀌고, 화면은 5분마다 확인합니다.
 const GROUND = -160; // 땅 높이 (월드 좌표)
 const DT = 1 / 120;
@@ -31,7 +34,24 @@ const store = {
       /* 저장 못 해도 게임은 그대로 */
     }
   },
+  remove(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      /* 무시 */
+    }
+  },
+  keys() {
+    try {
+      return Object.keys(localStorage);
+    } catch {
+      return [];
+    }
+  },
 };
+
+// 소리·진동 (사용자가 끄면 기억합니다)
+const feedback = createFeedback({ enabled: store.get('kc.sound', true) !== false });
 
 let historyData = null;
 let selectedHistory = null;
@@ -55,11 +75,19 @@ let view = { w: 0, h: 0, dpr: 1 };
 // ---------------------------------------------------------------- 데이터
 
 async function loadData() {
-  const res = await fetch(`${DATA_URL}?v=${Date.now()}`, { cache: 'no-store' });
-  if (!res.ok) throw new Error(res.status);
-  const json = await res.json();
-  if (!Array.isArray(json.points) || json.points.length < 2) throw new Error('empty');
-  return json;
+  let lastError;
+  for (const url of LIVE_DATA_URLS) {
+    try {
+      const res = await fetch(`${url}?v=${Date.now()}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(res.status);
+      const json = await res.json();
+      if (!Array.isArray(json.points) || json.points.length < 2) throw new Error('empty');
+      return json;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
 }
 
 function applyData(json) {
@@ -125,7 +153,9 @@ function rebuildCourse() {
     return;
   }
   const track = buildTrack(win.points, stats, { series: range.series, length: range.length, log: !!range.log, duration: range.duration });
-  course = { range, win, stats, track, key: `${selectedHistory ? "history:" : ""}${range.id}:${win.endT}` };
+  // 최고 기록은 실시간 코스는 날짜별, 역사 코스는 코스별로 남깁니다.
+  const key = bestKey({ historical: !!selectedHistory, id: range.id, endDate: win.points.at(-1).date });
+  course = { range, win, stats, track, key };
   miniCache = null;
   if (mode !== 'ride') newRide(true);
   renderMenu();
@@ -163,6 +193,7 @@ function setMode(next) {
   $('history-menu').hidden = next !== 'history';
   $('result').hidden = next !== 'result';
   $('hud').hidden = next !== 'ride';
+  $('guide').hidden = next !== 'guide';
   setHands(false);
   // 숨겨져 있던 캔버스는 크기가 0이라, 보일 때 다시 잽니다.
   if (next === 'ride') sizeCanvas(mini);
@@ -244,10 +275,50 @@ const fmtPrice = (p) => p.toLocaleString('ko-KR', { minimumFractionDigits: 2, ma
 
 function startRide() {
   if (!course) return;
+  feedback.unlock(); // 버튼을 누른 순간에만 소리를 켤 수 있습니다
+  if (!store.get('kc.guide', false)) return openGuide(true); // 첫 탑승 전에 한 번 안내
   newRide(false);
   setMode('ride');
   renderChoices($('speeds'), SPEEDS, speed, pickSpeed);
-  toast('출발! 🎢 누르고 있으면 만세 · 위 그래프를 눌러 이동');
+  feedback.event('start');
+  toast('출발! 🎢 누르고 있으면 만세');
+}
+
+// ---------------------------------------------------------------- 타는 법 안내
+
+let guideStartsRide = false;
+
+/** @param thenRide true면 확인을 누를 때 바로 출발, false면 메뉴로 돌아갑니다 */
+function openGuide(thenRide) {
+  guideStartsRide = thenRide;
+  $('guide-ok').textContent = thenRide ? '출발! 🎢' : '확인';
+  setMode('guide');
+  $('guide').scrollTop = 0;
+}
+
+function closeGuide() {
+  store.set('kc.guide', true);
+  if (guideStartsRide) startRide();
+  else setMode('menu');
+}
+
+// ---------------------------------------------------------------- 소리·진동 켜기/끄기
+
+function renderSound() {
+  const on = feedback.enabled;
+  $('menu-sound').textContent = on ? '🔊 소리 켬' : '🔇 소리 끔';
+  $('hud-sound').textContent = on ? '🔊' : '🔇';
+  for (const id of ['menu-sound', 'hud-sound']) {
+    $(id).setAttribute('aria-pressed', String(on));
+    $(id).setAttribute('aria-label', on ? '소리·진동 끄기' : '소리·진동 켜기');
+  }
+}
+
+function toggleSound() {
+  feedback.setEnabled(!feedback.enabled);
+  store.set('kc.sound', feedback.enabled);
+  renderSound();
+  toast(feedback.enabled ? '🔊 소리·진동을 켰어요' : '🔇 소리·진동을 껐어요');
 }
 
 function exitRide() {
@@ -304,22 +375,25 @@ for (const ev of ['pointerup', 'pointercancel']) mini.addEventListener(ev, () =>
 function finishRide() {
   ride.done = true;
   const { stats, range, win } = course;
-  const bestKey = `kc.best.${course.key}`;
-  const prevBest = store.get(bestKey, 0);
+  const prevBest = store.get(course.key, 0);
   const score = Math.floor(ride.score);
   // 위 그래프로 구간을 건너뛴 탑승은 최고 기록에 넣지 않습니다.
-  if (score > prevBest && !ride.seeked) store.set(bestKey, score);
+  if (score > prevBest && !ride.seeked) store.set(course.key, score);
+  if (!ride.fainted) feedback.event('finish');
+  const mine = selectedHistory ? '이 코스 최고 기록' : '오늘 최고 기록';
 
   $('res-course').textContent = range.label;
-  $('res-title').textContent = ride.fainted ? '기절! 😵' : score >= 3000 ? '완주! 🎉' : '도착!';
+  $('res-title').textContent = resultTitle({ fainted: ride.fainted, score });
   $('res-score').textContent = fmtNum(score);
   $('res-best').textContent = ride.seeked
     ? '구간을 건너뛰어서 최고 기록에는 넣지 않았어요'
     : score > prevBest && prevBest > 0
-      ? `이 레일 최고 기록 경신! (이전 ${fmtNum(prevBest)}점)`
+      ? `${mine} 경신! (이전 ${fmtNum(prevBest)}점)`
       : prevBest > 0
-        ? `이 레일 최고 기록 ${fmtNum(Math.max(prevBest, score))}점`
-        : `${range.label} 레일 · ${formatFor(win.endT, range.series)}까지`;
+        ? `${mine} ${fmtNum(prevBest)}점`
+        : score > 0
+          ? `첫 기록! ${mine}으로 저장했어요`
+          : `${range.label} 레일 · ${formatFor(win.endT, range.series)}까지`;
   setChange($('res-change'), stats.changePct);
   $('res-stars').textContent = starText(stats.stars);
   $('res-speed').textContent = `${toKmh(ride.maxV)} km/h`;
@@ -327,24 +401,42 @@ function finishRide() {
   setMode('result');
 }
 
+let sharing = false;
 async function share() {
-  const { stats, range, win } = course;
+  if (sharing || !course || !ride) return;
+  sharing = true;
+  const { stats, range, win, track } = course;
+  const span = `${formatFor(win.points[0].t, range.series)} → ${formatFor(win.endT, range.series)}`;
+  const change = `${stats.changePct >= 0 ? '▲' : '▼'}${Math.abs(stats.changePct).toFixed(2)}%`;
+  const score = Math.floor(ride.score);
   const text = [
-    `🎢 KOSPI 코스터 [${range.label}] ${formatFor(win.points[0].t, range.series)} → ${formatFor(win.endT, range.series)}`,
-    `구간 ${stats.changePct >= 0 ? '▲' : '▼'}${Math.abs(stats.changePct).toFixed(2)}% · 스릴 ${starText(stats.stars)}`,
-    `만세 점수 ${fmtNum(ride.score)}점 · 최고 ${toKmh(ride.maxV)}km/h · 최대 ${ride.maxG.toFixed(1)}G${ride.fainted ? ' · 기절 😵' : ''}`,
+    `🎢 KOSPI 코스터 [${range.label}] ${span}`,
+    `구간 ${change} · 스릴 ${starText(stats.stars)}`,
+    `만세 점수 ${fmtNum(score)}점 · 최고 ${toKmh(ride.maxV)}km/h · 최대 ${ride.maxG.toFixed(1)}G${ride.fainted ? ' · 기절 😵' : ''}`,
   ].join('\n');
-  const url = location.href.split('#')[0];
-  try {
-    if (navigator.share) {
-      await navigator.share({ text, url });
-      return;
-    }
-    await navigator.clipboard.writeText(`${text}\n${url}`);
-    toast('결과를 복사했어요');
-  } catch {
-    /* 사용자가 취소 */
-  }
+  // 카드에 그릴 레일 모양 (240점 안팎으로 간추림)
+  const main = track.nodes.filter((n) => n.zone === 'main' || n.zone === 'tunnel');
+  const every = Math.max(1, Math.floor(main.length / 240));
+  const chart = main.filter((_, i) => i % every === 0 || i === main.length - 1).map((n) => ({ x: n.x / track.xEnd, y: n.y / H }));
+  const card = {
+    label: selectedHistory ? range.label : `${range.label} 코스`,
+    span,
+    title: resultTitle({ fainted: ride.fainted, score }),
+    score: fmtNum(score),
+    change,
+    changeUp: stats.changePct >= 0,
+    stars: starText(stats.stars),
+    speed: `${toKmh(ride.maxV)} km/h`,
+    g: `${ride.maxG.toFixed(1)} G`,
+    note: '실제 코스피 지수로 만든 오락용 게임 · 투자 조언이 아니에요',
+    chart,
+    base: main[0].y / H,
+  };
+  const outcome = await shareResult({ card, text, url: SHARE_URL, allowSave: ON_SITE });
+  sharing = false;
+  if (outcome === 'copied') toast(ON_SITE ? '결과 글을 복사하고 이미지를 저장했어요' : '결과를 복사했어요');
+  else if (outcome === 'saved') toast('결과 이미지를 저장했어요');
+  else if (outcome === 'failed') toast('여기서는 공유할 수 없어요');
 }
 
 let toastTimer = 0;
@@ -359,7 +451,9 @@ function toast(msg) {
 // ---------------------------------------------------------------- 입력
 
 function setHands(on) {
+  const was = !!ride?.hands;
   if (ride) ride.hands = on && mode === 'ride' && !ride.fainted;
+  if (ride?.hands && !was) feedback.event('hands');
   $('hands').classList.toggle('on', !!ride?.hands);
 }
 canvas.addEventListener('pointerdown', () => mode === 'ride' && setHands(true));
@@ -373,6 +467,7 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     setHands(true);
   } else if (e.code === 'Enter' && mode === 'menu') startRide();
+  else if (e.code === 'Enter' && mode === 'guide') closeGuide();
 });
 window.addEventListener('keyup', (e) => e.code === 'Space' && setHands(false));
 window.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -382,6 +477,10 @@ $('again').addEventListener('click', startRide);
 $('share').addEventListener('click', share);
 $('to-menu').addEventListener('click', exitRide);
 $('hud-exit').addEventListener('click', exitRide);
+$('open-guide').addEventListener('click', () => openGuide(false));
+$('guide-ok').addEventListener('click', closeGuide);
+$('menu-sound').addEventListener('click', toggleSound);
+$('hud-sound').addEventListener('click', toggleSound);
 window.addEventListener('keydown', (e) => e.code === 'Escape' && mode === 'ride' && exitRide());
 
 function pickHistory(id) {
@@ -464,6 +563,7 @@ function tick(dt) {
     const info = { ang: here.ang, zone: here.zone, v: ride.v, g: ride.g, vLift: track.vLift, vMax: PHYS.vMax };
     if (applyRules(ride, info, dt)) {
       setHands(false);
+      feedback.event('faint');
       toast('😵 기절했어요… 끝까지 실려 갑니다');
     }
   }
@@ -1004,10 +1104,14 @@ function frame(now) {
   last = now;
   update(dt);
   render(dt);
+  const riding = mode === 'ride' && ride && !ride.demo && !ride.done && !dragging;
+  feedback.frame(riding ? { s: ride.s, v: ride.v, vMax: PHYS.vMax, g: ride.g, zone: ride.here.zone } : null);
   requestAnimationFrame(frame);
 }
 
 async function boot() {
+  for (const key of staleBestKeys(store.keys())) store.remove(key); // 오래된 기록 정리
+  renderSound();
   resize();
   window.addEventListener('resize', resize);
   setMode('menu');
@@ -1022,7 +1126,13 @@ async function boot() {
     $('data-info').textContent = '데이터를 불러오지 못했어요. 잠시 뒤 새로고침해 주세요.';
   }
   setInterval(checkUpdate, REFRESH_MS);
-  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && checkUpdate());
+  // 화면을 벗어나면 소리를 바로 멈추고, 돌아오면 다시 켭니다.
+  document.addEventListener('visibilitychange', () => {
+    feedback.setBackground(document.hidden);
+    if (!document.hidden) checkUpdate();
+  });
+  window.addEventListener('pagehide', () => feedback.setBackground(true));
+  window.addEventListener('pageshow', () => feedback.setBackground(document.hidden));
 }
 
 boot();

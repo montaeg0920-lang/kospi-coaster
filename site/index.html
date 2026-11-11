@@ -6,6 +6,25 @@
   <title>KOSPI 코스터</title>
   <meta name="description" content="코스피 그래프가 그대로 롤러코스터 레일이 됩니다. 장중 1시간마다 새 레일." />
   <meta name="theme-color" content="#0f1729" />
+  <!-- 링크를 붙였을 때 보이는 미리보기 -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="KOSPI 코스터" />
+  <meta property="og:title" content="KOSPI 코스터 🎢 코스피 그래프를 타는 롤러코스터" />
+  <meta property="og:description" content="오늘의 코스피 그래프가 그대로 레일이 됩니다. 장중 1시간마다 새 레일." />
+  <meta property="og:url" content="https://montaeg0920-lang.github.io/kospi-coaster/" />
+  <meta property="og:image" content="https://montaeg0920-lang.github.io/kospi-coaster/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:locale" content="ko_KR" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <!-- 아이콘 · 홈 화면에 추가 -->
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="KOSPI 코스터" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap" rel="stylesheet" />
@@ -32,6 +51,7 @@
       <button id="hud-exit" class="hud-exit" type="button">나가기</button>
     </div>
     <div id="weather-mood" class="weather-mood">☁ 잠시 숨 고르기</div>
+    <button id="hud-sound" class="hud-sound" type="button">🔊</button>
     <div class="hud-bottom">
       <div class="gauge">
         <div class="speeds" id="speeds" role="radiogroup" aria-label="배속"></div>
@@ -62,8 +82,12 @@
       <div id="win-note" class="note" hidden></div>
     </div>
     <button id="start" class="primary" type="button">탑승하기 🎢</button>
-    <p class="howto">화면이나 🙌 버튼을 <b>누르고 있는 동안 만세!</b> 빠르고 아찔할수록 점수가 커져요. 내리막만 내려가도 멀미가 쌓이고, 손을 들면 더 쌓여요. 멀미 100%면 기절. 탑승 중에 위 그래프를 눌러 이동하고, 배속·기간도 바꿀 수 있어요.</p>
+    <div class="menu-tools">
+      <button id="open-guide" class="tool" type="button">❔ 타는 법</button>
+      <button id="menu-sound" class="tool" type="button">🔊 소리 켬</button>
+    </div>
     <p id="data-info" class="data-info">데이터 불러오는 중…</p>
+    <p class="disclaimer">실제 코스피 지수로 만든 오락용 게임이에요. 투자 권유나 조언이 아니에요.</p>
   </section>
 
   <section id="history-menu" class="panel" hidden>
@@ -92,6 +116,26 @@
       <button id="again" class="primary" type="button">다시 타기</button>
     </div>
     <button id="to-menu" class="link" type="button">기간 바꾸기</button>
+  </section>
+
+  <!-- 타는 법 (첫 탑승 전에 한 번, 메뉴에서 다시 볼 수 있음) -->
+  <section id="guide" class="panel" hidden>
+    <h2 class="res-title">타는 법</h2>
+    <ol class="guide-list">
+      <li>
+        <span class="guide-icon" aria-hidden="true">🙌</span>
+        <div><b>누르고 있으면 만세</b><small>화면이나 만세 버튼을 누르는 동안 점수가 쌓여요. 빠르고 아찔할수록 많이 쌓여요.</small></div>
+      </li>
+      <li>
+        <span class="guide-icon" aria-hidden="true">🤢</span>
+        <div><b>내리막에서는 멀미</b><small>내려가기만 해도 쌓이고, 손을 들면 더 쌓여요. 100%면 기절! 오르막에서 손을 내리면 가라앉아요.</small></div>
+      </li>
+      <li>
+        <span class="guide-icon" aria-hidden="true">📈</span>
+        <div><b>위 그래프로 이동</b><small>그래프를 누르거나 기차를 끌면 그 위치로 가요. 배속과 기간도 타는 중에 바꿀 수 있어요.</small></div>
+      </li>
+    </ol>
+    <button id="guide-ok" class="primary" type="button">출발! 🎢</button>
   </section>
 
   <div id="toast" class="toast" hidden></div>

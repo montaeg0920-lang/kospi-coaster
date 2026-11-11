@@ -13,6 +13,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: write # 예약 실행이 꺼지지 않게 워크플로를 다시 켜 두는 데 씁니다
 
 concurrency:
   group: pages
@@ -23,11 +24,11 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -43,11 +44,30 @@ jobs:
       - name: 새 버전의 게임 파일 사용
         run: node scripts/version-assets.mjs
 
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
+        continue-on-error: true
+
+      # 방금 올린 파일을 GitHub이 잠깐 못 찾아 배포가 실패하는 일이 있어, 30초 뒤 한 번 더 시도합니다.
+      - name: 배포 재시도 전 대기
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 30
+
+      - id: deployment_retry
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v5
+
+      # GitHub은 저장소에 60일 동안 변화가 없으면 예약 실행을 끕니다.
+      # 예약 실행 때마다 워크플로를 '켜짐'으로 다시 표시해 두면 그 기한이 새로 시작됩니다.
+      - name: 예약 실행 유지
+        if: github.event_name == 'schedule'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/deploy.yml/enable"

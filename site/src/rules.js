@@ -56,3 +56,9 @@ export function applyRules(ride, { ang, zone, v, g, vLift, vMax }, dt) {
   }
   return false;
 }
+
+/** 결과 화면 제목: 기절하지 않고 끝까지 타면 완주입니다. */
+export function resultTitle({ fainted, score }) {
+  if (fainted) return '기절! 😵';
+  return score > 0 ? '완주! 🎉' : '무사 도착!';
+}

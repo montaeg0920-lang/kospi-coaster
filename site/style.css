@@ -165,3 +165,24 @@ button:disabled { opacity: .45; cursor: wait; }
 .weather-mood { position: absolute; top: calc(220px + env(safe-area-inset-top)); left: 16px; padding: 7px 12px; border: 1px solid rgba(255,255,255,.2); border-radius: 99px; background: rgba(15,23,41,.75); color: #e6edf8; font-size: 12px; font-weight: 700; }
 .weather-mood[data-mood="up"] { color: #ffe58d; border-color: rgba(255,222,122,.5); }
 .weather-mood[data-mood="down"] { color: #c0d7f3; border-color: rgba(152,183,220,.5); }
+
+/* ---------- 소리 켜기/끄기 ---------- */
+.menu-tools { display: flex; justify-content: center; gap: 8px; margin-top: 12px; }
+.menu-tools .tool {
+  padding: 8px 14px; border-radius: 99px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.08);
+  color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.hud-sound {
+  position: absolute; top: calc(216px + env(safe-area-inset-top)); right: 16px; width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(15, 23, 41, 0.75); font-size: 18px; line-height: 1;
+  pointer-events: auto; cursor: pointer;
+}
+
+/* ---------- 타는 법 ---------- */
+.guide-list { list-style: none; margin: 10px 0 18px; padding: 0; display: grid; gap: 10px; text-align: left; }
+.guide-list li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; background: rgba(255, 255, 255, 0.06); }
+.guide-icon { flex: none; font-size: 28px; line-height: 1.2; }
+.guide-list b { display: block; font-size: 16px; }
+.guide-list small { display: block; margin-top: 3px; color: var(--muted); font-size: 13px; line-height: 1.5; word-break: keep-all; }
+
+.disclaimer { font-size: 11px; color: var(--muted); margin: 4px 0 0; line-height: 1.5; opacity: 0.85; }
