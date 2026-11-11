@@ -26,9 +26,14 @@
         <div class="hud-sub"><span id="hud-speed">0</span> km/h · <span id="hud-g">1.0</span>G <span id="hud-combo" class="combo"></span></div>
       </div>
     </div>
-    <canvas id="minimap"></canvas>
+    <canvas id="minimap" aria-label="기차를 끌거나 눌러서 그 위치로 이동"></canvas>
+    <div class="hud-controls">
+      <div class="hud-ranges" id="hud-ranges" role="radiogroup" aria-label="탑승 기간"></div>
+      <button id="hud-exit" class="hud-exit" type="button" aria-label="나가기">✕</button>
+    </div>
     <div class="hud-bottom">
       <div class="gauge">
+        <div class="speeds" id="speeds" role="radiogroup" aria-label="배속"></div>
         <div class="gauge-label">멀미 <span id="gauge-text">0%</span></div>
         <div class="gauge-bar"><div id="gauge-fill"></div></div>
       </div>
@@ -51,7 +56,7 @@
       <div id="win-note" class="note" hidden></div>
     </div>
     <button id="start" class="primary" type="button">탑승하기 🎢</button>
-    <p class="howto">화면이나 🙌 버튼을 <b>누르고 있는 동안 만세!</b> 빠르고 아찔할수록 점수가 커지지만 멀미도 쌓여요. 멀미 100%면 기절.</p>
+    <p class="howto">화면이나 🙌 버튼을 <b>누르고 있는 동안 만세!</b> 빠르고 아찔할수록 점수가 커져요. 내리막만 내려가도 멀미가 쌓이고, 손을 들면 더 쌓여요. 멀미 100%면 기절. 탑승 중에 위 그래프를 눌러 이동하고, 배속·기간도 바꿀 수 있어요.</p>
     <p id="data-info" class="data-info">데이터 불러오는 중…</p>
   </section>
 

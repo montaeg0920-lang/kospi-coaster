@@ -48,7 +48,22 @@ html, body {
 .hud-score small { font-size: 14px; margin-left: 2px; }
 .hud-sub { font-size: 13px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
 .combo { color: var(--accent); font-weight: 800; }
-#minimap { display: block; width: calc(100% - 32px); height: 44px; margin: 0 16px; border-radius: 8px; background: rgba(0, 0, 0, 0.28); }
+#minimap {
+  display: block; width: calc(100% - 32px); height: 48px; margin: 0 16px; border-radius: 8px; background: rgba(0, 0, 0, 0.28);
+  pointer-events: auto; cursor: grab; touch-action: none;
+}
+.hud-controls { display: flex; gap: 8px; align-items: center; padding: 8px 16px 0; pointer-events: auto; }
+.hud-ranges { flex: 1; min-width: 0; display: flex; gap: 4px; }
+.hud-ranges button, .speeds button {
+  flex: 1; min-width: 0; padding: 7px 0; border-radius: 8px; border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.38); color: var(--text); font: inherit; font-size: 12px; font-weight: 800; cursor: pointer;
+}
+.hud-ranges button[aria-checked="true"], .speeds button[aria-checked="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.hud-exit {
+  flex: none; width: 36px; height: 32px; border-radius: 8px; border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.5); color: var(--text); font-size: 16px; font-weight: 800; cursor: pointer;
+}
+.speeds { display: flex; gap: 4px; max-width: 220px; margin-bottom: 10px; pointer-events: auto; }
 
 .hud-bottom {
   position: absolute; left: 0; right: 0; bottom: 0;
@@ -124,7 +139,7 @@ button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 .row button { flex: 1; }
 
 .toast {
-  position: fixed; left: 50%; top: calc(118px + env(safe-area-inset-top)); transform: translateX(-50%);
+  position: fixed; left: 50%; top: calc(162px + env(safe-area-inset-top)); transform: translateX(-50%);
   max-width: calc(100% - 32px);
   padding: 10px 16px; border-radius: 99px; background: rgba(0, 0, 0, 0.78); border: 1px solid var(--line);
   font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
