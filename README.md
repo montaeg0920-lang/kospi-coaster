@@ -149,7 +149,7 @@ test/records.test.mjs  최고 기록 저장 규칙·결과 제목 테스트
 첫 화면에서 6종(노란 후드, 초록 재킷, 시바견, 곰, 로봇, 우주비행사) 가운데 하나를 고르면, 그 캐릭터 세 명이
 열차 세 칸에 한 명씩 탑니다. 만세를 하면 세 명 모두 손을 번쩍 든 그림으로 바뀌어 폴짝폴짝 뛰고, 기절하면 뒤로 넘어갑니다.
 그림은 `site/characters/*.png`, 목록은 `site/src/characters.js`에 있습니다.
-만세 그림(`*-cheer.png`)은 원래 그림에 위로 뻗은 팔을 그려 넣어 만듭니다: `python3 scripts/make-cheer.py` (Pillow 필요).
+만세 그림(`*-cheer.png`)은 만세 캐릭터 시트에서 잘라 앉은 그림과 크기를 맞춥니다: `python3 scripts/prepare-cheer.py <시트.png>` (Pillow 필요).
 
 ## 토스 인앱 (앱인토스)
 

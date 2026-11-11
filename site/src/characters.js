@@ -12,11 +12,11 @@ export const DEFAULT_CHARACTER = CHARACTERS[0].id;
 
 export const characterSrc = (id) => `characters/${id}.png`;
 
-/** 손을 번쩍 든 만세 그림 (scripts/make-cheer.py가 만듭니다) */
+/** 손을 번쩍 든 만세 그림 (scripts/prepare-cheer.py가 만세 시트에서 잘라 만듭니다) */
 export const cheerSrc = (id) => `characters/${id}-cheer.png`;
 
 /** 만세 그림은 원래 그림(256×256)보다 좌우로 PAD_X, 위로 PAD_TOP만큼 넓습니다. */
-export const CHEER_PAD = { x: 40, top: 56, size: 256 };
+export const CHEER_PAD = { x: 40, top: 64, size: 256 };
 
 export const isCharacter = (id) => CHARACTERS.some((c) => c.id === id);
 
