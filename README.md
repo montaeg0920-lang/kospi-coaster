@@ -102,7 +102,7 @@ site/
   src/config.js   실행 환경 설정 (데이터·공유 주소)
   src/characters.js 캐릭터 목록
   src/platform.js 웹/토스 인앱 차이를 모은 곳
-  characters/     캐릭터 그림 6장
+  characters/     캐릭터 9종의 기본·만세 그림
   src/main.js     그리기, 조작, 자동 갱신
   data/kospi.json 지수 데이터 (Actions가 매시간 덮어씀)
   og.png, favicon.svg, icon-*.png, apple-touch-icon.png, manifest.webmanifest
@@ -149,7 +149,7 @@ test/records.test.mjs  최고 기록 저장 규칙·결과 제목 테스트
 
 ## 캐릭터
 
-첫 화면에서 6종(노란 후드, 초록 재킷, 시바견, 곰, 로봇, 우주비행사) 가운데 하나를 고르면, 그 캐릭터 세 명이
+첫 화면에서 9종(노란 후드, 초록 재킷, 고양이, 시바견, 토끼, 곰, 로봇, 공룡, 우주비행사) 가운데 하나를 고르면, 그 캐릭터 세 명이
 열차 세 칸에 한 명씩 탑니다. 만세를 하면 세 명 모두 손을 번쩍 든 그림으로 바뀌어 폴짝폴짝 뛰고, 기절하면 뒤로 넘어갑니다.
 그림은 `site/characters/*.png`, 목록은 `site/src/characters.js`에 있습니다.
 만세 그림(`*-cheer.png`)은 만세 캐릭터 시트에서 잘라 앉은 그림과 크기를 맞춥니다: `python3 scripts/prepare-cheer.py <시트.png>` (Pillow 필요).

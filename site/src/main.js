@@ -276,8 +276,8 @@ function renderCharacters() {
   for (const b of box.children) {
     const picked = b.dataset.id === characterId;
     b.setAttribute('aria-checked', String(picked));
-    // 고른 캐릭터는 만세 그림으로 보여 줍니다
-    b.firstChild.src = picked ? cheerSrc(b.dataset.id) : characterSrc(b.dataset.id);
+    // 첫 화면에서는 9명 모두 손을 든 모습으로 보여 줍니다.
+    b.firstChild.src = cheerSrc(b.dataset.id);
   }
 }
 

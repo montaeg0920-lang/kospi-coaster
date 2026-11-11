@@ -1,10 +1,13 @@
-// 탑승 캐릭터 6종 (그림: site/characters/*.png)
+// 탑승 캐릭터 9종 (그림: site/characters/*.png)
 export const CHARACTERS = [
   { id: 'boy', label: '노란 후드' },
   { id: 'girl', label: '초록 재킷' },
+  { id: 'cat', label: '고양이' },
   { id: 'shiba', label: '시바견' },
+  { id: 'rabbit', label: '토끼' },
   { id: 'bear', label: '곰' },
   { id: 'robot', label: '로봇' },
+  { id: 'dinosaur', label: '공룡' },
   { id: 'astronaut', label: '우주비행사' },
 ];
 

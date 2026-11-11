@@ -1,4 +1,4 @@
-"""만세 그림 준비: 만세 캐릭터 시트(3×3)에서 6명을 잘라 site/characters/<id>-cheer.png 로 저장합니다.
+"""만세 그림 준비: 만세 캐릭터 시트(3×3)에서 9명을 잘라 site/characters/<id>-cheer.png 로 저장합니다.
 
   python3 scripts/prepare-cheer.py <만세 시트.png>
 
@@ -19,9 +19,12 @@ PAD_TOP = 64
 PICKS = {
     1: ('boy', (310, 419)),
     2: ('girl', (313, 400)),
+    3: ('cat', (288, 419)),
     4: ('shiba', (303, 388)),
+    5: ('rabbit', (269, 415)),
     6: ('bear', (326, 383)),
     7: ('robot', (310, 406)),
+    8: ('dinosaur', (285, 406)),
     9: ('astronaut', (325, 400)),
 }
 
