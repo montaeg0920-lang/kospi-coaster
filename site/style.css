@@ -9,6 +9,11 @@
   --accent: #ffd23f;
   --accent-ink: #2a1d00;
   color-scheme: dark;
+  /* 화면 가장자리에서 가려지는 영역. 앱 안에서는 toss/bridge.js가 실제 값(px)으로 바꿉니다. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --top-extra: 0px; /* 앱이 화면 위쪽에 띄우는 닫기 버튼 높이 */
+  --top-inset: calc(var(--safe-top) + var(--top-extra));
 }
 
 * { box-sizing: border-box; }
@@ -37,7 +42,7 @@ html, body {
 #hud { position: fixed; inset: 0; pointer-events: none; }
 .hud-top {
   display: flex; justify-content: space-between; gap: 12px;
-  padding: calc(10px + env(safe-area-inset-top)) 16px 6px;
+  padding: calc(10px + var(--top-inset)) 16px 6px;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 .hud-time { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -70,7 +75,7 @@ html, body {
 .hud-bottom {
   position: absolute; left: 0; right: 0; bottom: 0;
   display: flex; align-items: flex-end; gap: 14px;
-  padding: 0 16px calc(16px + env(safe-area-inset-bottom));
+  padding: 0 16px calc(16px + var(--safe-bottom));
 }
 .gauge { flex: 1; min-width: 0; }
 .gauge-label { font-size: 13px; font-weight: 700; margin-bottom: 6px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); }
@@ -90,8 +95,8 @@ html, body {
 
 /* ---------- 패널 ---------- */
 .panel {
-  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  width: min(440px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto;
+  position: fixed; left: 50%; top: calc(50% + (var(--top-inset) - var(--safe-bottom)) / 2); transform: translate(-50%, -50%);
+  width: min(440px, calc(100% - 32px)); max-height: calc(100% - 32px - var(--top-inset) - var(--safe-bottom)); overflow: auto;
   padding: 22px 20px 18px; border-radius: 20px;
   background: var(--panel); border: 1px solid var(--line);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
@@ -141,7 +146,7 @@ button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 .row button { flex: 1; }
 
 .toast {
-  position: fixed; left: 50%; top: calc(162px + env(safe-area-inset-top)); transform: translateX(-50%);
+  position: fixed; left: 50%; top: calc(162px + var(--top-inset)); transform: translateX(-50%);
   max-width: calc(100% - 32px);
   padding: 10px 16px; border-radius: 99px; background: rgba(0, 0, 0, 0.78); border: 1px solid var(--line);
   font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -162,7 +167,7 @@ button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 #history-menu { touch-action: pan-y; }
 button:disabled { opacity: .45; cursor: wait; }
 
-.weather-mood { position: absolute; top: calc(220px + env(safe-area-inset-top)); left: 16px; padding: 7px 12px; border: 1px solid rgba(255,255,255,.2); border-radius: 99px; background: rgba(15,23,41,.75); color: #e6edf8; font-size: 12px; font-weight: 700; }
+.weather-mood { position: absolute; top: calc(220px + var(--top-inset)); left: 16px; padding: 7px 12px; border: 1px solid rgba(255,255,255,.2); border-radius: 99px; background: rgba(15,23,41,.75); color: #e6edf8; font-size: 12px; font-weight: 700; }
 .weather-mood[data-mood="up"] { color: #ffe58d; border-color: rgba(255,222,122,.5); }
 .weather-mood[data-mood="down"] { color: #c0d7f3; border-color: rgba(152,183,220,.5); }
 
@@ -173,7 +178,7 @@ button:disabled { opacity: .45; cursor: wait; }
   color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
 }
 .hud-sound {
-  position: absolute; top: calc(216px + env(safe-area-inset-top)); right: 16px; width: 40px; height: 40px; border-radius: 50%;
+  position: absolute; top: calc(216px + var(--top-inset)); right: 16px; width: 40px; height: 40px; border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(15, 23, 41, 0.75); font-size: 18px; line-height: 1;
   pointer-events: auto; cursor: pointer;
 }
@@ -186,3 +191,29 @@ button:disabled { opacity: .45; cursor: wait; }
 .guide-list small { display: block; margin-top: 3px; color: var(--muted); font-size: 13px; line-height: 1.5; word-break: keep-all; }
 
 .disclaimer { font-size: 11px; color: var(--muted); margin: 4px 0 0; line-height: 1.5; opacity: 0.85; }
+
+/* ---------- 캐릭터 선택 ---------- */
+.characters { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 0 0 14px; }
+.characters button {
+  aspect-ratio: 1; padding: 3px 3px 0; border-radius: 14px; border: 2px solid transparent;
+  background: rgba(255, 255, 255, 0.06); cursor: pointer; overflow: hidden;
+}
+.characters img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: bottom; pointer-events: none; }
+.characters button[aria-checked="true"] { border-color: var(--accent); background: rgba(255, 210, 63, 0.18); }
+.characters button[aria-checked="false"] img { opacity: 0.7; }
+
+/* ---------- 순위 (앱 안에서 순위표를 쓸 수 있을 때만) ---------- */
+.rank-only { display: none; }
+.can-rank .rank-only { display: inline-block; }
+.rank-wide { width: 100%; margin-top: 8px; }
+
+/* ---------- 종료 확인 ---------- */
+.modal { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(4, 8, 18, 0.72); touch-action: auto; }
+.modal-box { width: min(340px, 100%); padding: 22px 20px 18px; border-radius: 20px; background: #16213f; border: 1px solid var(--line); text-align: center; }
+.modal-box h2 { margin: 0 0 6px; font-size: 20px; }
+.modal-box p { margin: 0 0 18px; color: var(--muted); font-size: 14px; }
+.modal-box .row button { font-size: 15px; padding: 12px 10px; }
+
+.safe-probe { position: fixed; left: 0; width: 1px; visibility: hidden; pointer-events: none; }
+#safe-probe-top { top: 0; height: var(--top-inset); }
+#safe-probe-bottom { bottom: 0; height: var(--safe-bottom); }

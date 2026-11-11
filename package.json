@@ -1,1 +1,17 @@
-{"name":"kospi-coaster","private":true,"type":"module","scripts":{"fetch":"node scripts/fetch-kospi.mjs","dev":"node scripts/serve.mjs","test":"node --test test/*.test.mjs"}}
+{
+  "name": "kospi-coaster",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "fetch": "node scripts/fetch-kospi.mjs",
+    "dev": "node scripts/serve.mjs",
+    "test": "node --test test/*.test.mjs",
+    "toss:bundle": "node scripts/build-toss.mjs",
+    "toss:build": "node scripts/build-toss.mjs && ait build",
+    "toss:deploy": "ait deploy"
+  },
+  "devDependencies": {
+    "@apps-in-toss/web-framework": "^3.10.0",
+    "esbuild": "^0.28.2"
+  }
+}

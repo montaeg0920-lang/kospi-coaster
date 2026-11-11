@@ -5,6 +5,8 @@
 //  - 출발·만세·기절·도착 효과음, 기절·도착·큰 G 진동.
 //  - 켜기/끄기는 사용자가 정하고, 화면을 벗어나면 바로 멈췄다가 돌아오면 다시 납니다.
 
+import { platform } from './platform.js';
+
 const CLACK_EVERY = 170; // 이 거리(px)를 달릴 때마다 덜컹
 const CLACK_MIN_GAP = 0.045; // 덜컹 사이 최소 간격(초) — 4배속에서도 소리가 뭉치지 않게
 
@@ -93,8 +95,10 @@ export function createFeedback({ enabled = true } = {}) {
     src.start(t, Math.random() * 1.5, 0.06);
   }
 
-  function vibrate(pattern) {
+  /** @param kind 앱 진동의 종류 이름, pattern 웹 진동의 길이(ms) */
+  function vibrate(kind, pattern) {
     if (!on || background) return;
+    if (platform.haptic(kind)) return; // 앱 안에서는 앱의 진동 기능을 씁니다 (아이폰 포함)
     try {
       globalThis.navigator?.vibrate?.(pattern);
     } catch {
@@ -169,9 +173,9 @@ export function createFeedback({ enabled = true } = {}) {
       }
       // 크게 눌리거나 뜨는 순간 짧게 진동
       const now = globalThis.performance?.now() ?? 0;
-      if (Math.abs(ride.g - 1) > 1.6 && now - lastBuzzAt > 260) {
+      if (Math.abs(ride.g - 1) > 1.6 && now - lastBuzzAt > 500) {
         lastBuzzAt = now;
-        vibrate(14);
+        vibrate('bump', 14);
       }
     },
 
@@ -180,16 +184,16 @@ export function createFeedback({ enabled = true } = {}) {
       if (name === 'start') {
         tone(660, 0.16, { type: 'triangle' });
         tone(880, 0.3, { type: 'triangle', delay: 0.14 });
-        vibrate(10);
+        vibrate('start', 10);
       } else if (name === 'hands') {
         tone(520, 0.09, { gain: 0.07, to: 820 });
-        vibrate(8);
+        vibrate('hands', 8);
       } else if (name === 'faint') {
         tone(420, 0.75, { type: 'sawtooth', gain: 0.13, to: 90 });
-        vibrate([70, 50, 180]);
+        vibrate('faint', [70, 50, 180]);
       } else if (name === 'finish') {
         [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.32, { type: 'triangle', delay: i * 0.11 }));
-        vibrate([25, 40, 25]);
+        vibrate('finish', [25, 40, 25]);
       }
     },
 

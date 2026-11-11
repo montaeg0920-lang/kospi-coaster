@@ -7,6 +7,8 @@ import { createFeedback } from './feedback.js';
 import { bestKey, staleBestKeys } from './records.js';
 import { shareResult } from './share.js';
 import { LIVE_DATA_URLS, ON_SITE, SHARE_URL } from './config.js';
+import { CHARACTERS, DEFAULT_CHARACTER, characterSrc, isCharacter, crew } from './characters.js';
+import { platform } from './platform.js';
 
 const REFRESH_MS = 5 * 60 * 1000; // 데이터 파일은 1시간마다 바뀌고, 화면은 5분마다 확인합니다.
 const GROUND = -160; // 땅 높이 (월드 좌표)
@@ -33,6 +35,7 @@ const store = {
     } catch {
       /* 저장 못 해도 게임은 그대로 */
     }
+    platform.persist();
   },
   remove(key) {
     try {
@@ -40,6 +43,7 @@ const store = {
     } catch {
       /* 무시 */
     }
+    platform.persist();
   },
   keys() {
     try {
@@ -50,6 +54,9 @@ const store = {
   },
 };
 
+// 앱 안에서는 앱 저장소에 남겨 둔 설정·기록을 먼저 불러옵니다 (웹에서는 바로 지나갑니다).
+await platform.restore();
+
 // 소리·진동 (사용자가 끄면 기억합니다)
 const feedback = createFeedback({ enabled: store.get('kc.sound', true) !== false });
 
@@ -59,7 +66,17 @@ let data = null;
 let points = [];
 let pending = null;
 let rangeId = RANGES.some((r) => r.id === store.get('kc.range')) ? store.get('kc.range') : '1d';
-let mode = 'loading'; // menu | ride | result
+let mode = 'loading'; // menu | history | guide | ride | result
+
+// 탑승 캐릭터
+let characterId = isCharacter(store.get('kc.character')) ? store.get('kc.character') : DEFAULT_CHARACTER;
+const sprites = Object.fromEntries(
+  CHARACTERS.map((c) => {
+    const img = new Image();
+    img.src = characterSrc(c.id);
+    return [c.id, img];
+  }),
+);
 let course = null;
 let ride = null;
 let miniCache = null;
@@ -187,6 +204,7 @@ function newRide(demo) {
 
 // ---------------------------------------------------------------- 화면 상태
 
+let awake = false;
 function setMode(next) {
   mode = next;
   $('menu').hidden = next !== 'menu';
@@ -195,6 +213,11 @@ function setMode(next) {
   $('hud').hidden = next !== 'ride';
   $('guide').hidden = next !== 'guide';
   setHands(false);
+  // 타는 동안에는 화면이 꺼지지 않게 합니다 (앱 안에서만 동작).
+  if ((next === 'ride') !== awake) {
+    awake = next === 'ride';
+    platform.keepAwake(awake);
+  }
   // 숨겨져 있던 캔버스는 크기가 0이라, 보일 때 다시 잽니다.
   if (next === 'ride') sizeCanvas(mini);
   if (next === 'menu') sizeCanvas(preview);
@@ -226,6 +249,31 @@ function pickRange(id) {
   if (pending) applyData(pending);
   else rebuildCourse();
   if (mode === 'ride') startRide();
+}
+
+function renderCharacters() {
+  const box = $('characters');
+  if (!box.childElementCount) {
+    for (const c of CHARACTERS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.id = c.id;
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-label', c.label);
+      const img = document.createElement('img');
+      img.src = characterSrc(c.id);
+      img.alt = '';
+      img.draggable = false;
+      b.append(img);
+      b.addEventListener('click', () => {
+        characterId = c.id;
+        store.set('kc.character', c.id);
+        renderCharacters();
+      });
+      box.append(b);
+    }
+  }
+  for (const b of box.children) b.setAttribute('aria-checked', String(b.dataset.id === characterId));
 }
 
 function renderMenu() {
@@ -380,6 +428,7 @@ function finishRide() {
   // 위 그래프로 구간을 건너뛴 탑승은 최고 기록에 넣지 않습니다.
   if (score > prevBest && !ride.seeked) store.set(course.key, score);
   if (!ride.fainted) feedback.event('finish');
+  if (score > 0 && !ride.seeked) platform.submitScore(score); // 앱 안에서는 순위표에 점수를 올립니다
   const mine = selectedHistory ? '이 코스 최고 기록' : '오늘 최고 기록';
 
   $('res-course').textContent = range.label;
@@ -432,6 +481,10 @@ async function share() {
     chart,
     base: main[0].y / H,
   };
+  if (platform.inApp && (await platform.share(text))) {
+    sharing = false;
+    return;
+  }
   const outcome = await shareResult({ card, text, url: SHARE_URL, allowSave: ON_SITE });
   sharing = false;
   if (outcome === 'copied') toast(ON_SITE ? '결과 글을 복사하고 이미지를 저장했어요' : '결과를 복사했어요');
@@ -478,6 +531,30 @@ $('share').addEventListener('click', share);
 $('to-menu').addEventListener('click', exitRide);
 $('hud-exit').addEventListener('click', exitRide);
 $('open-guide').addEventListener('click', () => openGuide(false));
+for (const id of ['menu-rank', 'res-rank']) $(id).addEventListener('click', () => platform.openRanking());
+
+// ---------------------------------------------------------------- 뒤로가기 · 종료 확인 (앱 안에서)
+
+function backToLive() {
+  selectedHistory = null;
+  setMode('menu');
+  if (pending) applyData(pending);
+  else rebuildCourse();
+  resize();
+}
+
+/** 기기의 뒤로가기: 한 단계씩 앞 화면으로 돌아가고, 첫 화면에서는 종료할지 묻습니다. */
+function handleBack() {
+  if (!$('exit-confirm').hidden) $('exit-confirm').hidden = true;
+  else if (mode === 'ride' || mode === 'result') exitRide();
+  else if (mode === 'guide') setMode('menu');
+  else if (mode === 'history') backToLive();
+  else if (mode === 'menu' && selectedHistory) setMode('history');
+  else $('exit-confirm').hidden = false;
+}
+platform.onBack(handleBack);
+$('exit-stay').addEventListener('click', () => ($('exit-confirm').hidden = true));
+$('exit-leave').addEventListener('click', () => platform.close());
 $('guide-ok').addEventListener('click', closeGuide);
 $('menu-sound').addEventListener('click', toggleSound);
 $('hud-sound').addEventListener('click', toggleSound);
@@ -530,12 +607,7 @@ async function loadHistory() {
 $('open-history').addEventListener('click', () => { setMode('history'); $('history-menu').scrollTop = 0; });
 $('back-history').addEventListener('click', () => setMode('history'));
 $('retry-history').addEventListener('click', loadHistory);
-$('back-live').addEventListener('click', () => {
-  selectedHistory = null;
-  setMode('menu');
-  if (pending) applyData(pending); else rebuildCourse();
-  resize();
-});
+$('back-live').addEventListener('click', backToLive);
 
 // ---------------------------------------------------------------- 시뮬레이션
 
@@ -588,6 +660,8 @@ function spark() {
 function resize() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   view = { w: window.innerWidth, h: window.innerHeight, dpr };
+  // 노치·앱 상단 버튼 등으로 가려지는 높이 (CSS의 --safe-top 등과 같은 값)
+  inset = { top: $('safe-probe-top').offsetHeight, bottom: $('safe-probe-bottom').offsetHeight };
   for (const c of [canvas]) {
     c.width = Math.round(view.w * dpr);
     c.height = Math.round(view.h * dpr);
@@ -607,10 +681,11 @@ function sizeCanvas(c) {
 // 화면 위쪽(HUD)과 아래쪽(게이지) 사이에 최저~최고 높이를 맞춥니다.
 const TOP_PAD = 150;
 const BOTTOM_PAD = 150;
+let inset = { top: 0, bottom: 0 };
 function scale() {
-  return Math.max(0.06, Math.min((view.h - TOP_PAD - BOTTOM_PAD) / H, view.w / 900));
+  return Math.max(0.06, Math.min((view.h - TOP_PAD - BOTTOM_PAD - inset.top - inset.bottom) / H, view.w / 900));
 }
-const baseY = () => view.h - BOTTOM_PAD;
+const baseY = () => view.h - BOTTOM_PAD - inset.bottom;
 const viewWorldW = () => view.w / scale();
 
 function render(dt) {
@@ -910,43 +985,34 @@ function drawTrain(sc, X, Y) {
   const u = Math.max(0.8, Math.min(1.35, Math.min(view.w, view.h) / 520));
   const carLen = 40 * u;
   const colors = ['#ffd23f', '#ff4d57', '#ff4d57'];
+  const riders = crew(characterId); // 맨 앞 칸이 고른 캐릭터
+  const now = performance.now() / 1000;
   for (let k = 2; k >= 0; k--) {
     const at = sampleAt(course.track, ride.s - (k * (carLen + 4)) / sc);
     ctx.save();
     ctx.translate(X(at.x), Y(at.y));
     ctx.rotate(-at.ang);
     ctx.scale(u, u);
-    // 승객
-    for (const hx of [-9, 9]) {
-      const up = ride.hands;
-      ctx.strokeStyle = '#ffe0bd';
-      ctx.lineWidth = 3;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      if (up) {
-        ctx.moveTo(hx - 3, -20);
-        ctx.lineTo(hx - 8, -36);
-        ctx.moveTo(hx + 3, -20);
-        ctx.lineTo(hx + 8, -36);
-      } else {
-        ctx.moveTo(hx - 4, -18);
-        ctx.lineTo(hx - 7, -12);
-        ctx.moveTo(hx + 4, -18);
-        ctx.lineTo(hx + 7, -12);
-      }
-      ctx.stroke();
-      ctx.fillStyle = ride.fainted ? '#b9c0cc' : '#ffe0bd';
-      ctx.beginPath();
-      ctx.arc(hx, -24, 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#2b2b2b';
+    // 승객: 칸마다 캐릭터 한 명 (차체가 아래쪽을 가려서 손잡이를 잡은 것처럼 보입니다)
+    const img = sprites[riders[k]];
+    if (img?.complete && img.naturalWidth) {
+      ctx.save();
       if (ride.fainted) {
-        ctx.font = '700 7px system-ui';
+        ctx.translate(0, -14);
+        ctx.rotate(-0.38);
+        ctx.translate(0, 14);
+        ctx.globalAlpha = 0.8;
+      } else if (ride.hands) {
+        // 만세: 폴짝폴짝 뛰며 좌우로 흔들
+        ctx.translate(0, -5 - 2.5 * Math.sin(now * 16 + k));
+        ctx.rotate(0.09 * Math.sin(now * 11 + k * 2));
+      }
+      ctx.drawImage(img, -19, -47, 38, 38);
+      ctx.restore();
+      if (ride.fainted && k === 0) {
+        ctx.font = '14px system-ui';
         ctx.textAlign = 'center';
-        ctx.fillText('x x', hx, -22);
-      } else {
-        ctx.fillRect(hx - 3, -26, 1.6, 1.6);
-        ctx.fillRect(hx + 1.6, -26, 1.6, 1.6);
+        ctx.fillText('💫', -8, -50);
       }
     }
     // 차체
@@ -1112,6 +1178,10 @@ function frame(now) {
 async function boot() {
   for (const key of staleBestKeys(store.keys())) store.remove(key); // 오래된 기록 정리
   renderSound();
+  renderCharacters();
+  document.documentElement.classList.toggle('can-rank', platform.canRank);
+  platform.identify(); // 앱 안에서 사용자 식별값 확인 (게임 로그인)
+  new ResizeObserver(resize).observe($('safe-probe-top')); // 가려지는 높이가 바뀌면 다시 맞춤
   resize();
   window.addEventListener('resize', resize);
   setMode('menu');
