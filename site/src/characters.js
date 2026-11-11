@@ -12,13 +12,19 @@ export const DEFAULT_CHARACTER = CHARACTERS[0].id;
 
 export const characterSrc = (id) => `characters/${id}.png`;
 
+/** 손을 번쩍 든 만세 그림 (scripts/make-cheer.py가 만듭니다) */
+export const cheerSrc = (id) => `characters/${id}-cheer.png`;
+
+/** 만세 그림은 원래 그림(256×256)보다 좌우로 PAD_X, 위로 PAD_TOP만큼 넓습니다. */
+export const CHEER_PAD = { x: 40, top: 56, size: 256 };
+
 export const isCharacter = (id) => CHARACTERS.some((c) => c.id === id);
 
 /**
- * 열차 세 칸에 탈 캐릭터. 맨 앞 칸에 고른 캐릭터가 타고, 뒤 칸에는 목록에서 그다음 친구들이 탑니다.
+ * 열차 세 칸에 탈 캐릭터: 고른 캐릭터 세 명이 한 칸씩 탑니다.
  * @returns {string[]} 앞 칸부터 세 개의 id
  */
 export function crew(selectedId) {
-  const start = Math.max(0, CHARACTERS.findIndex((c) => c.id === selectedId));
-  return [0, 1, 2].map((k) => CHARACTERS[(start + k) % CHARACTERS.length].id);
+  const id = isCharacter(selectedId) ? selectedId : DEFAULT_CHARACTER;
+  return [id, id, id];
 }

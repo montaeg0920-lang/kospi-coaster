@@ -7,7 +7,7 @@ import { createFeedback } from './feedback.js';
 import { bestKey, staleBestKeys } from './records.js';
 import { shareResult } from './share.js';
 import { LIVE_DATA_URLS, ON_SITE, SHARE_URL } from './config.js';
-import { CHARACTERS, DEFAULT_CHARACTER, characterSrc, isCharacter, crew } from './characters.js';
+import { CHARACTERS, DEFAULT_CHARACTER, characterSrc, cheerSrc, CHEER_PAD, isCharacter, crew } from './characters.js';
 import { platform } from './platform.js';
 
 const REFRESH_MS = 5 * 60 * 1000; // 데이터 파일은 1시간마다 바뀌고, 화면은 5분마다 확인합니다.
@@ -70,13 +70,13 @@ let mode = 'loading'; // menu | history | guide | ride | result
 
 // 탑승 캐릭터
 let characterId = isCharacter(store.get('kc.character')) ? store.get('kc.character') : DEFAULT_CHARACTER;
-const sprites = Object.fromEntries(
-  CHARACTERS.map((c) => {
-    const img = new Image();
-    img.src = characterSrc(c.id);
-    return [c.id, img];
-  }),
-);
+const loadImage = (src) => {
+  const img = new Image();
+  img.src = src;
+  return img;
+};
+const sprites = Object.fromEntries(CHARACTERS.map((c) => [c.id, loadImage(characterSrc(c.id))]));
+const cheers = Object.fromEntries(CHARACTERS.map((c) => [c.id, loadImage(cheerSrc(c.id))]));
 let course = null;
 let ride = null;
 let miniCache = null;
@@ -273,7 +273,12 @@ function renderCharacters() {
       box.append(b);
     }
   }
-  for (const b of box.children) b.setAttribute('aria-checked', String(b.dataset.id === characterId));
+  for (const b of box.children) {
+    const picked = b.dataset.id === characterId;
+    b.setAttribute('aria-checked', String(picked));
+    // 고른 캐릭터는 만세 그림으로 보여 줍니다
+    b.firstChild.src = picked ? cheerSrc(b.dataset.id) : characterSrc(b.dataset.id);
+  }
 }
 
 function renderMenu() {
@@ -985,7 +990,7 @@ function drawTrain(sc, X, Y) {
   const u = Math.max(0.8, Math.min(1.35, Math.min(view.w, view.h) / 520));
   const carLen = 40 * u;
   const colors = ['#ffd23f', '#ff4d57', '#ff4d57'];
-  const riders = crew(characterId); // 맨 앞 칸이 고른 캐릭터
+  const riders = crew(characterId); // 세 칸 모두 고른 캐릭터
   const now = performance.now() / 1000;
   for (let k = 2; k >= 0; k--) {
     const at = sampleAt(course.track, ride.s - (k * (carLen + 4)) / sc);
@@ -993,24 +998,33 @@ function drawTrain(sc, X, Y) {
     ctx.translate(X(at.x), Y(at.y));
     ctx.rotate(-at.ang);
     ctx.scale(u, u);
-    // 승객: 칸마다 캐릭터 한 명 (차체가 아래쪽을 가려서 손잡이를 잡은 것처럼 보입니다)
-    const img = sprites[riders[k]];
-    if (img?.complete && img.naturalWidth) {
+    // 승객: 고른 캐릭터가 칸마다 한 명씩. 만세를 하면 세 명 모두 손을 번쩍 든 그림으로 바뀝니다.
+    // (차체가 아래쪽을 가려서 자리에 앉은 것처럼 보입니다)
+    const id = riders[k];
+    const base = sprites[id];
+    const cheer = cheers[id];
+    const SIZE = 38; // 원래 그림이 그려지는 크기
+    const cheering = ride.hands && !ride.fainted && cheer?.complete && cheer.naturalWidth;
+    if (cheering) {
+      ctx.save();
+      // 폴짝폴짝 뛰며 좌우로 살짝 흔들 (칸마다 박자를 조금씩 다르게)
+      ctx.translate(0, -4 - 2.5 * Math.abs(Math.sin(now * 9 + k * 0.9)));
+      ctx.rotate(0.07 * Math.sin(now * 11 + k * 2));
+      const f = SIZE / CHEER_PAD.size;
+      ctx.drawImage(cheer, -SIZE / 2 - CHEER_PAD.x * f, -47 - CHEER_PAD.top * f, cheer.naturalWidth * f, cheer.naturalHeight * f);
+      ctx.restore();
+    } else if (base?.complete && base.naturalWidth) {
       ctx.save();
       if (ride.fainted) {
         ctx.translate(0, -14);
         ctx.rotate(-0.38);
         ctx.translate(0, 14);
         ctx.globalAlpha = 0.8;
-      } else if (ride.hands) {
-        // 만세: 폴짝폴짝 뛰며 좌우로 흔들
-        ctx.translate(0, -5 - 2.5 * Math.sin(now * 16 + k));
-        ctx.rotate(0.09 * Math.sin(now * 11 + k * 2));
       }
-      ctx.drawImage(img, -19, -47, 38, 38);
+      ctx.drawImage(base, -SIZE / 2, -47, SIZE, SIZE);
       ctx.restore();
-      if (ride.fainted && k === 0) {
-        ctx.font = '14px system-ui';
+      if (ride.fainted) {
+        ctx.font = '12px system-ui';
         ctx.textAlign = 'center';
         ctx.fillText('💫', -8, -50);
       }
