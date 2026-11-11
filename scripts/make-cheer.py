@@ -29,12 +29,21 @@ STYLE = {
 }
 
 
-def arm(draw, pts, width, color, outline_w):
-    """팔: 테두리 → 속 색 순서로 굵은 선과 관절의 원을 그립니다."""
-    for w, c in ((width + 2 * outline_w, OUTLINE), (width, color)):
-        draw.line(pts, fill=c, width=int(w), joint="curve")
-        for x, y in pts:
-            r = w / 2
+def bezier(p0, p1, p2, n=48):
+    """2차 베지어 곡선 위의 점들"""
+    out = []
+    for i in range(n + 1):
+        t = i / n
+        a, b, c = (1 - t) ** 2, 2 * (1 - t) * t, t * t
+        out.append((a * p0[0] + b * p1[0] + c * p2[0], a * p0[1] + b * p1[1] + c * p2[1], t))
+    return out
+
+
+def tube(draw, curve, r0, r1, color, outline):
+    """곡선을 따라 굵기가 r0 → r1로 줄어드는 팔. 테두리를 먼저 다 그린 뒤 속을 칠해 이음매가 안 보이게 합니다."""
+    for pad, c in ((outline, OUTLINE), (0, color)):
+        for x, y, t in curve:
+            r = r0 + (r1 - r0) * t + pad
             draw.ellipse((x - r, y - r, x + r, y + r), fill=c)
 
 
@@ -49,19 +58,18 @@ def make(cid):
 
     for side in (-1, 1):
         cx = W / 2
-        # 어깨(몸 뒤) → 팔꿈치(머리 옆) → 손(머리 위 바깥쪽)
-        shoulder = (cx + side * 72, PAD_TOP + 196)
-        elbow = (cx + side * 118, PAD_TOP + 108)
-        wrist = (cx + side * 112, PAD_TOP + 28)
-        pts = [(x * k, y * k) for x, y in (shoulder, elbow, wrist)]
-        arm(d, pts, 30 * k, s['sleeve'], o)
+        # 어깨(몸통 윗부분 안쪽, 몸에 가려짐) → 바깥으로 둥글게 → 머리 옆 위로 쭉
+        shoulder = (cx + side * 54, PAD_TOP + 182)
+        bend = (cx + side * 108, PAD_TOP + 118)
+        wrist = (cx + side * 104, PAD_TOP + 34)
+        curve = [(x * k, y * k, t) for x, y, t in bezier(shoulder, bend, wrist)]
+        tube(d, curve, 17 * k, 12.5 * k, s['sleeve'], o)
         if s['cuff']:
-            # 소매 끝 띠
-            wx, wy = wrist
-            arm(d, [((wx - side * 1) * k, (wy + 8) * k), (wx * k, (wy + 1) * k)], 31 * k, s['cuff'], o)
-        # 손
-        hx, hy = wrist[0] + side * 2, wrist[1] - 18
-        r = 19 if s['kind'] != 'paw' else 20
+            # 소매 끝 띠: 곡선의 마지막 부분
+            tube(d, curve[-7:], 14 * k, 13.5 * k, s['cuff'], o)
+        # 손: 손목보다 살짝 위
+        hx, hy = wrist[0] + side * 3, wrist[1] - 16
+        r = 17 if s['kind'] != 'paw' else 18
         d.ellipse(((hx - r) * k - o, (hy - r) * k - o, (hx + r) * k + o, (hy + r) * k + o), fill=OUTLINE)
         d.ellipse(((hx - r) * k, (hy - r) * k, (hx + r) * k, (hy + r) * k), fill=s['hand'])
         if s['kind'] == 'hand':

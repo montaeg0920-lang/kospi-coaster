@@ -1007,9 +1007,11 @@ function drawTrain(sc, X, Y) {
     const cheering = ride.hands && !ride.fainted && cheer?.complete && cheer.naturalWidth;
     if (cheering) {
       ctx.save();
-      // 폴짝폴짝 뛰며 좌우로 살짝 흔들 (칸마다 박자를 조금씩 다르게)
-      ctx.translate(0, -4 - 2.5 * Math.abs(Math.sin(now * 9 + k * 0.9)));
-      ctx.rotate(0.07 * Math.sin(now * 11 + k * 2));
+      // 자리에 앉은 채로 좌우로 살짝 흔들 (엉덩이를 축으로, 칸마다 박자를 조금씩 다르게).
+      // 위로 들어 올리면 그림 아래 잘린 부분이 칸 위로 드러나므로 들어 올리지 않습니다.
+      ctx.translate(0, -12);
+      ctx.rotate(0.06 * Math.sin(now * 10 + k * 1.7));
+      ctx.translate(0, 12);
       const f = SIZE / CHEER_PAD.size;
       ctx.drawImage(cheer, -SIZE / 2 - CHEER_PAD.x * f, -47 - CHEER_PAD.top * f, cheer.naturalWidth * f, cheer.naturalHeight * f);
       ctx.restore();
