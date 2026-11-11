@@ -14,7 +14,7 @@ export const PHYS = {
   launch: 650,
 };
 
-export const RIDE_LIMIT = 30; // 모든 탑승은 이 시간(초) 안에 끝납니다.
+export const RIDE_LIMIT = 30; // 일반 코스의 최대 탑승 시간(초). 역사 코스는 별도 duration을 사용합니다.
 const RIDE_TARGET = 28; // 화면 프레임 차이를 감안한 여유
 const DT = 1 / 120;
 
@@ -37,7 +37,7 @@ export function heightScale(stats, log = false) {
   return (p) => (p - stats.min) / span;
 }
 
-export function buildTrack(points, stats, { series = 'minute', length, log = false } = {}) {
+export function buildTrack(points, stats, { series = 'minute', length, log = false, duration = RIDE_LIMIT } = {}) {
   const norm = heightScale(stats, log);
   const intraday = series === 'minute';
   // 1) 데이터 점마다 "레일 위 칸" 좌표를 매깁니다. 1분봉은 1칸 = 1분, 그 밖에는 봉 하나 = 1칸.
@@ -142,7 +142,7 @@ export function buildTrack(points, stats, { series = 'minute', length, log = fal
     log,
     vLift: PHYS.vLift,
   };
-  track.vLift = fitLift(track);
+  track.vLift = fitLift(track, duration - 2);
   return track;
 }
 
@@ -161,14 +161,14 @@ export function rideTime(track, vLift = track.vLift, limit = 120) {
   return t;
 }
 
-/** 30초 안에 끝나도록 오르막 속도를 정합니다 (기본 속도로 충분하면 그대로). */
-function fitLift(track) {
+/** 코스의 목표 시간 안에 끝나도록 오르막 속도를 정합니다. */
+function fitLift(track, target = RIDE_TARGET) {
   let lo = PHYS.vLift;
-  if (rideTime(track, lo) <= RIDE_TARGET) return lo;
+  if (rideTime(track, lo) <= target) return lo;
   let hi = PHYS.vMax;
   for (let k = 0; k < 12; k++) {
     const mid = (lo + hi) / 2;
-    if (rideTime(track, mid) <= RIDE_TARGET) hi = mid;
+    if (rideTime(track, mid) <= target) hi = mid;
     else lo = mid;
   }
   return hi;

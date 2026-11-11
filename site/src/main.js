@@ -1,3 +1,4 @@
+import { HISTORY, historicalWindow, historicalStats } from './history.js';
 import { RANGES, SERIES_KEY, toPoints, withLatest, selectWindow, summarize, formatT, formatFor, tickOf } from './window.js';
 import { H, PHYS, buildTrack, sampleAt, step, toKmh } from './track.js';
 
@@ -30,6 +31,8 @@ const store = {
   },
 };
 
+let historyData = null;
+let selectedHistory = null;
 let data = null;
 let points = [];
 let pending = null;
@@ -58,7 +61,7 @@ function applyData(json) {
   data = json;
   points = toPoints(json.points);
   pending = null;
-  rebuildCourse();
+  if (!selectedHistory) rebuildCourse();
   renderDataInfo();
 }
 
@@ -66,6 +69,12 @@ async function checkUpdate() {
   try {
     const json = await loadData();
     if (data && json.updatedAt === data.updatedAt) return;
+    if (selectedHistory) {
+      data = json;
+      points = toPoints(json.points);
+      pending = null;
+      return;
+    }
     const lastNew = json.points.at(-1)[0];
     const lastOld = data?.points.at(-1)[0];
     if (mode === 'ride') {
@@ -81,6 +90,10 @@ async function checkUpdate() {
 }
 
 function renderDataInfo() {
+  if (selectedHistory) {
+    $('data-info').textContent = `${historyData?.source ?? ''} · 일봉 · 일반 눈금 · 낮 고정`;
+    return;
+  }
   if (!data) return;
   const updated = new Intl.DateTimeFormat('ko-KR', {
     timeZone: 'Asia/Seoul',
@@ -96,18 +109,18 @@ function renderDataInfo() {
 // ---------------------------------------------------------------- 코스
 
 function rebuildCourse() {
-  const range = RANGES.find((r) => r.id === rangeId) ?? RANGES[0];
+  const range = selectedHistory ?? RANGES.find((r) => r.id === rangeId) ?? RANGES[0];
   // 1일·1주는 1분봉, 3달은 시간봉, 1년·5년은 일봉, 전체는 주봉. 끝은 모두 1분봉의 최신 값(=지금)에 맞춥니다.
   const series = range.series === 'minute' ? points : withLatest(toPoints(data?.[SERIES_KEY[range.series]]), points.at(-1));
-  const win = selectWindow(series, range);
-  const stats = summarize(win, range);
+  const win = selectedHistory ? historicalWindow(historyData, range) : selectWindow(series, range);
+  const stats = selectedHistory ? historicalStats(win, range) : summarize(win, range);
   if (!stats) {
     course = null;
     renderMenu();
     return;
   }
-  const track = buildTrack(win.points, stats, { series: range.series, length: range.length, log: !!range.log });
-  course = { range, win, stats, track, key: `${range.id}:${win.endT}` };
+  const track = buildTrack(win.points, stats, { series: range.series, length: range.length, log: !!range.log, duration: range.duration });
+  course = { range, win, stats, track, key: `${selectedHistory ? "history:" : ""}${range.id}:${win.endT}` };
   miniCache = null;
   if (mode !== 'ride') newRide(true);
   renderMenu();
@@ -140,6 +153,7 @@ function newRide(demo) {
 function setMode(next) {
   mode = next;
   $('menu').hidden = next !== 'menu';
+  $('history-menu').hidden = next !== 'history';
   $('result').hidden = next !== 'result';
   $('hud').hidden = next !== 'ride';
   setHands(false);
@@ -150,6 +164,17 @@ function setMode(next) {
 }
 
 function renderMenu() {
+  const historical = !!selectedHistory;
+  $('open-history').hidden = historical;
+  $('back-history').hidden = !historical;
+  $('ranges').hidden = historical;
+  $('course-title').hidden = !historical;
+  $('course-description').hidden = !historical;
+  $('history-stats').hidden = !historical;
+  $('course-title').textContent = selectedHistory?.label ?? '';
+  $('course-description').textContent = selectedHistory?.description ?? '';
+  $('to-menu').textContent = historical ? '다른 역사 코스 타기' : '기간 바꾸기';
+  renderDataInfo();
   const box = $('ranges');
   if (!box.childElementCount) {
     for (const r of RANGES) {
@@ -174,6 +199,7 @@ function renderMenu() {
     return;
   }
   const { win, stats } = course;
+  if (historical) $('history-stats').textContent = `최대 낙폭 ${stats.drawdown.toFixed(2)}% · ${selectedHistory.duration}초 이내 탑승`;
   const s = course.range.series;
   $('win-span').textContent = `${formatFor(win.points[0].t, s)} → ${formatFor(win.endT, s)}`;
   setChange($('win-change'), stats.changePct);
@@ -210,6 +236,7 @@ function finishRide() {
   const score = Math.floor(ride.score);
   if (score > prevBest) store.set(bestKey, score);
 
+  $('res-course').textContent = range.label;
   $('res-title').textContent = ride.fainted ? '기절! 😵' : score >= 3000 ? '완주! 🎉' : '도착!';
   $('res-score').textContent = fmtNum(score);
   $('res-best').textContent =
@@ -279,9 +306,56 @@ $('start').addEventListener('click', startRide);
 $('again').addEventListener('click', startRide);
 $('share').addEventListener('click', share);
 $('to-menu').addEventListener('click', () => {
+  if (selectedHistory) { setMode('history'); return; }
   if (pending) applyData(pending);
   else newRide(true);
   setMode('menu');
+});
+
+async function loadHistory() {
+  $('history-status').hidden = false;
+  $('history-status').textContent = '역사 코스 불러오는 중…';
+  $('retry-history').hidden = true;
+  try {
+    const res = await fetch('data/history.json');
+    if (!res.ok) throw new Error('history');
+    const json = await res.json();
+    const cards = HISTORY.map(range => {
+      const win = historicalWindow(json, range);
+      const stats = historicalStats(win, range);
+      const button = document.createElement('button');
+      button.className = 'history-card';
+      button.type = 'button';
+      const title = document.createElement('strong'); title.textContent = range.label;
+      const desc = document.createElement('small'); desc.textContent = range.description;
+      const dates = document.createElement('small'); dates.textContent = `${formatFor(win.startT, 'daily')} → ${formatFor(win.endT, 'daily')}`;
+      const meta = document.createElement('span'); meta.className = 'history-meta';
+      const change = document.createElement('span'); setChange(change, stats.changePct);
+      const duration = document.createElement('span'); duration.textContent = `${range.duration}초 이내 · 선택하기 →`;
+      meta.append(change, duration); button.append(title, desc, dates, meta);
+      button.addEventListener('click', () => {
+        selectedHistory = range;
+        setMode('menu'); rebuildCourse(); resize();
+        $('menu').scrollTop = 0;
+      });
+      return button;
+    });
+    historyData = json;
+    $('history-list').replaceChildren(...cards);
+    $('history-status').hidden = true;
+  } catch {
+    $('history-status').textContent = '역사 데이터를 불러오지 못했어요. 다시 시도해 주세요.';
+    $('retry-history').hidden = false;
+  }
+}
+$('open-history').addEventListener('click', () => { setMode('history'); $('history-menu').scrollTop = 0; });
+$('back-history').addEventListener('click', () => setMode('history'));
+$('retry-history').addEventListener('click', loadHistory);
+$('back-live').addEventListener('click', () => {
+  selectedHistory = null;
+  setMode('menu');
+  if (pending) applyData(pending); else rebuildCourse();
+  resize();
 });
 
 // ---------------------------------------------------------------- 시뮬레이션
@@ -844,6 +918,7 @@ async function boot() {
   setMode('menu');
   renderMenu();
   requestAnimationFrame(frame);
+  loadHistory();
   try {
     applyData(await loadData());
     resize();

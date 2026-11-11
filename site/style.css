@@ -130,3 +130,17 @@ button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
   font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   pointer-events: none; z-index: 10;
 }
+
+/* 기존 패널과 동일한 역사 코스 선택 화면 */
+.history-entry { width: 100%; margin-bottom: 14px; line-height: 1.5; }
+.history-title { font-size: 23px; line-height: 1.45; margin: 0 0 10px; }
+.history-title span { color: var(--accent); }
+.course-title { font-size: 21px; margin: 10px 0 6px; }
+.history-list { display: grid; gap: 10px; text-align: left; }
+.history-card { display: grid; gap: 7px; width: 100%; padding: 15px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.05); color: var(--text); font: inherit; text-align: left; cursor: pointer; touch-action: pan-y; }
+.history-card:hover, .history-card:focus-visible { border-color: var(--accent); background: rgba(255,210,63,.08); }
+.history-card strong { font-size: 16px; }
+.history-card small { color: var(--muted); line-height: 1.5; }
+.history-card .history-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+#history-menu { touch-action: pan-y; }
+button:disabled { opacity: .45; cursor: wait; }

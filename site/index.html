@@ -40,6 +40,10 @@
   <section id="menu" class="panel" hidden>
     <h1 class="title">KOSPI <span>코스터</span></h1>
     <p class="lead">코스피 그래프가 그대로 레일이 됩니다</p>
+    <button id="open-history" class="secondary history-entry" type="button">코스피 대상승 대폭락<br>롤러코스터 타기 🎢</button>
+    <button id="back-history" class="link" type="button" hidden>← 7개 역사 코스 보기</button>
+    <h2 id="course-title" class="course-title" hidden></h2>
+    <p id="course-description" class="howto" hidden></p>
     <div class="ranges" id="ranges" role="radiogroup" aria-label="탑승 기간"></div>
     <canvas id="preview" class="preview"></canvas>
     <div class="info">
@@ -48,6 +52,7 @@
         <span id="win-change" class="chg">--</span>
         <span id="win-stars" class="stars">--</span>
       </div>
+      <div id="history-stats" class="note" hidden></div>
       <div id="win-note" class="note" hidden></div>
     </div>
     <button id="start" class="primary" type="button">탑승하기 🎢</button>
@@ -55,8 +60,18 @@
     <p id="data-info" class="data-info">데이터 불러오는 중…</p>
   </section>
 
+  <section id="history-menu" class="panel" hidden>
+    <h2 class="history-title">코스피 대상승 대폭락<br><span>롤러코스터 타기</span></h2>
+    <p class="lead">역사적 순간 7개 · 실제 코스피 종가로 만든 레일</p>
+    <div id="history-status" class="note" role="status">역사 코스 불러오는 중…</div>
+    <div id="history-list" class="history-list"></div>
+    <button id="retry-history" class="secondary" type="button" hidden>다시 불러오기</button>
+    <button id="back-live" class="link" type="button">← 일반 코스로 돌아가기</button>
+  </section>
+
   <!-- 결과 -->
   <section id="result" class="panel" hidden>
+    <p id="res-course" class="howto"></p>
     <h2 id="res-title" class="res-title">도착!</h2>
     <div class="res-score"><span id="res-score">0</span><small>점</small></div>
     <div id="res-best" class="res-best"></div>
