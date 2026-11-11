@@ -1,3 +1,4 @@
+import { weatherTarget, easeWeather, drawWeatherSky, drawWeatherFront } from './atmosphere.js';
 import { HISTORY, historicalWindow, historicalStats } from './history.js';
 import { RANGES, SERIES_KEY, toPoints, withLatest, selectWindow, summarize, formatT, formatFor, tickOf } from './window.js';
 import { H, PHYS, buildTrack, sampleAt, step, toKmh } from './track.js';
@@ -47,6 +48,8 @@ let camX = 0;
 let snapCam = false; // 구간 이동 직후에는 카메라를 바로 옮깁니다
 let shake = 0;
 let night = 0;
+const weather = { storm: 0, sun: 0, time: 0 };
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 let view = { w: 0, h: 0, dpr: 1 };
 
 // ---------------------------------------------------------------- 데이터
@@ -93,7 +96,7 @@ async function checkUpdate() {
 
 function renderDataInfo() {
   if (selectedHistory) {
-    $('data-info').textContent = `${historyData?.source ?? ''} · 일봉 · 일반 눈금 · 낮 고정`;
+    $('data-info').textContent = `${historyData?.source ?? ''} · 일봉 · 일반 눈금 · 등락에 따른 날씨`;
     return;
   }
   if (!data) return;
@@ -129,6 +132,7 @@ function rebuildCourse() {
 }
 
 function newRide(demo) {
+  weather.storm = 0; weather.sun = 0; weather.time = 0;
   ride = {
     demo,
     s: 0,
@@ -517,6 +521,15 @@ function render(dt) {
     ctx.fillRect(0, 0, w, h);
     return;
   }
+  const behind = sampleAt(course.track, Math.max(0, ride.s - Math.max(250, course.track.xEnd * 0.015)));
+  const targetWeather = weatherTarget({
+    ang: ride.here.ang,
+    zone: ride.here.zone,
+    changePct: (ride.here.p / behind.p - 1) * 100,
+    rangePct: (course.stats.max - course.stats.min) / course.stats.first * 100,
+  });
+  easeWeather(weather, targetWeather, dt);
+  weather.time += dt;
   const sc = scale();
   const target = ride.here.x - viewWorldW() * 0.3;
   camX = snapCam ? target : camX + (target - camX) * Math.min(1, dt * 5 * (mode === 'ride' ? Math.sqrt(speed) : 1));
@@ -532,6 +545,7 @@ function render(dt) {
     night = 0;
   }
   drawSky(w, h);
+  drawWeatherSky(ctx, w, h, weather, night, reducedMotion.matches);
   drawSkyline(w, h, sc);
   drawGrid(w, Y);
   drawGround(w, h, Y);
@@ -551,6 +565,7 @@ function render(dt) {
   drawTrain(sc, X, Y);
   if (ride.v > 1700) drawSpeedLines(w, h, (ride.v - 1700) / 1000);
 
+  drawWeatherFront(ctx, w, h, weather, reducedMotion.matches);
   if (mode === 'ride') updateHud();
 }
 
@@ -576,6 +591,10 @@ function drawSky(w, h) {
   const f = Math.max(0, Math.min(1, (clock - 540) / 390));
   let top = mix([70, 140, 230], [60, 70, 150], f);
   let bot = mix([175, 220, 255], [255, 180, 130], f);
+  top = mix(top, [32, 158, 244], weather.sun);
+  bot = mix(bot, [255, 235, 170], weather.sun);
+  top = mix(top, [39, 53, 74], weather.storm);
+  bot = mix(bot, [117, 135, 151], weather.storm);
   top = mix(top, [8, 10, 30], night);
   bot = mix(bot, [30, 30, 70], night);
   const g = ctx.createLinearGradient(0, 0, 0, h);
@@ -663,8 +682,8 @@ function drawGrid(w, Y) {
 function drawGround(w, h, Y) {
   const gy = Y(GROUND);
   const g = ctx.createLinearGradient(0, gy, 0, h);
-  g.addColorStop(0, rgb(mix([58, 120, 70], [20, 35, 40], night)));
-  g.addColorStop(1, rgb(mix([30, 70, 45], [10, 15, 25], night)));
+  g.addColorStop(0, rgb(mix(mix([58, 120, 70], [65, 155, 83], weather.sun), [36, 53, 58], Math.max(night, weather.storm))));
+  g.addColorStop(1, rgb(mix([30, 70, 45], [10, 15, 25], Math.max(night, weather.storm))));
   ctx.fillStyle = g;
   ctx.fillRect(0, gy, w, h - gy);
 }
@@ -716,6 +735,9 @@ function railColor(n) {
 }
 
 function drawRail(ns, i0, i1, X, Y) {
+  ctx.save();
+  ctx.shadowColor = weather.sun > weather.storm ? '#ffd45f' : '#76a8d9';
+  ctx.shadowBlur = reducedMotion.matches ? 0 : weather.sun * 10 + weather.storm * 3;
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   ctx.strokeStyle = 'rgba(10,12,25,0.85)';
@@ -740,6 +762,7 @@ function drawRail(ns, i0, i1, X, Y) {
     }
     ctx.stroke();
   }
+  ctx.restore();
 }
 
 function drawLabels(track, ns, i0, i1, X, Y) {
@@ -949,6 +972,10 @@ function drawChart(c, { marker }) {
 
 let hudFrame = 0;
 function updateHud() {
+  const stormy = weather.storm > 0.18 && weather.storm > weather.sun;
+  const sunny = weather.sun > 0.18 && weather.sun > weather.storm;
+  $('weather-mood').textContent = stormy ? '🌧 하락 구간' : sunny ? '☀ 상승 구간' : '☁ 잠시 숨 고르기';
+  $('weather-mood').dataset.mood = stormy ? 'down' : sunny ? 'up' : 'calm';
   drawChart(mini, { marker: true });
   if (hudFrame++ % 3) return;
   const { here } = ride;

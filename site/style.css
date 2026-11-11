@@ -161,3 +161,7 @@ button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 .history-card .history-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
 #history-menu { touch-action: pan-y; }
 button:disabled { opacity: .45; cursor: wait; }
+
+.weather-mood { position: absolute; top: calc(220px + env(safe-area-inset-top)); left: 16px; padding: 7px 12px; border: 1px solid rgba(255,255,255,.2); border-radius: 99px; background: rgba(15,23,41,.75); color: #e6edf8; font-size: 12px; font-weight: 700; }
+.weather-mood[data-mood="up"] { color: #ffe58d; border-color: rgba(255,222,122,.5); }
+.weather-mood[data-mood="down"] { color: #c0d7f3; border-color: rgba(152,183,220,.5); }
