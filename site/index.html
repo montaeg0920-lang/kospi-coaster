@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>KOSPI 코스터</title>
+  <meta name="description" content="코스피 그래프가 그대로 롤러코스터 레일이 됩니다. 장중 1시간마다 새 레일." />
+  <meta name="theme-color" content="#0f1729" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- 탑승 중 HUD -->
+  <div id="hud" hidden>
+    <div class="hud-top">
+      <div class="hud-left">
+        <div id="hud-time" class="hud-time">--</div>
+        <div class="hud-price"><span id="hud-price">--</span> <span id="hud-change" class="chg">--</span></div>
+      </div>
+      <div class="hud-right">
+        <div class="hud-score"><span id="hud-score">0</span><small>점</small></div>
+        <div class="hud-sub"><span id="hud-speed">0</span> km/h · <span id="hud-g">1.0</span>G <span id="hud-combo" class="combo"></span></div>
+      </div>
+    </div>
+    <canvas id="minimap"></canvas>
+    <div class="hud-bottom">
+      <div class="gauge">
+        <div class="gauge-label">멀미 <span id="gauge-text">0%</span></div>
+        <div class="gauge-bar"><div id="gauge-fill"></div></div>
+      </div>
+      <button id="hands" class="hands" type="button" aria-label="누르고 있는 동안 만세">🙌<span>만세</span></button>
+    </div>
+  </div>
+
+  <!-- 메뉴 -->
+  <section id="menu" class="panel" hidden>
+    <h1 class="title">KOSPI <span>코스터</span></h1>
+    <p class="lead">코스피 그래프가 그대로 레일이 됩니다</p>
+    <div class="ranges" id="ranges" role="radiogroup" aria-label="탑승 범위"></div>
+    <canvas id="preview" class="preview"></canvas>
+    <div class="info">
+      <div id="win-span" class="win-span">--</div>
+      <div class="win-stats">
+        <span id="win-change" class="chg">--</span>
+        <span id="win-stars" class="stars">--</span>
+      </div>
+      <div id="win-note" class="note" hidden></div>
+    </div>
+    <button id="start" class="primary" type="button">탑승하기 🎢</button>
+    <p class="howto">화면이나 🙌 버튼을 <b>누르고 있는 동안 만세!</b> 빠르고 아찔할수록 점수가 커지지만 멀미도 쌓여요. 멀미 100%면 기절.</p>
+    <p id="data-info" class="data-info">데이터 불러오는 중…</p>
+  </section>
+
+  <!-- 결과 -->
+  <section id="result" class="panel" hidden>
+    <h2 id="res-title" class="res-title">도착!</h2>
+    <div class="res-score"><span id="res-score">0</span><small>점</small></div>
+    <div id="res-best" class="res-best"></div>
+    <dl class="res-grid">
+      <div><dt>구간 등락</dt><dd id="res-change">--</dd></div>
+      <div><dt>스릴</dt><dd id="res-stars">--</dd></div>
+      <div><dt>최고 속도</dt><dd id="res-speed">--</dd></div>
+      <div><dt>최대 G</dt><dd id="res-g">--</dd></div>
+    </dl>
+    <div class="row">
+      <button id="share" class="secondary" type="button">결과 공유</button>
+      <button id="again" class="primary" type="button">다시 타기</button>
+    </div>
+    <button id="to-menu" class="link" type="button">범위 바꾸기</button>
+  </section>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+{"name":"kospi-coaster","private":true,"type":"module","scripts":{"fetch":"node scripts/fetch-kospi.mjs","dev":"node scripts/serve.mjs","test":"node --test test/*.test.mjs"}}

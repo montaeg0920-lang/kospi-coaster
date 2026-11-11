@@ -1,0 +1,49 @@
+name: 레일 갱신 & 배포
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # 평일 한국 시간 09:07~16:07 매시 + 18:07 (UTC 기준으로 적음)
+    - cron: '7 0-7,9 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 테스트
+        run: npm test
+
+      - name: 코스피 데이터 받기
+        run: node scripts/fetch-kospi.mjs
+        # 정기 실행에서 실패하면 배포를 건너뛰어 지금 떠 있는 레일을 유지합니다.
+        # 코드를 올렸을 때(push)는 저장소에 있는 데이터로라도 배포합니다.
+        continue-on-error: ${{ github.event_name != 'schedule' }}
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
