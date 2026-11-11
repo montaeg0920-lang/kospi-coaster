@@ -40,6 +40,9 @@ jobs:
         # 코드를 올렸을 때(push)는 저장소에 있는 데이터로라도 배포합니다.
         continue-on-error: ${{ github.event_name != 'schedule' }}
 
+      - name: 새 버전의 게임 파일 사용
+        run: node scripts/version-assets.mjs
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
