@@ -36,3 +36,18 @@ export function staleBestKeys(keys, today = kstToday(), keepDays = 14) {
     return !m || m[1] < cutoff;
   });
 }
+
+// ---------------------------------------------------------------- 누적 점수
+//  - 매 탑승 점수를 모두 더해 계속 쌓습니다 (기절한 판은 기절할 때까지의 점수).
+//  - 위 그래프로 구간을 건너뛴 판은 더하지 않습니다.
+//  - 기기 안에만 저장하므로 휴대폰을 바꾸면 0부터 다시 시작합니다.
+//  - 앱 안에서는 이 누적 점수를 토스 순위표에 올립니다.
+
+export const TOTAL_KEY = 'kc.total';
+
+/** 이번 탑승을 더한 누적 점수. 잘못된 값은 0으로 봅니다. */
+export function addToTotal(total, score, { seeked = false } = {}) {
+  const base = Number.isFinite(total) && total > 0 ? Math.floor(total) : 0;
+  if (seeked || !Number.isFinite(score) || score <= 0) return base;
+  return base + Math.floor(score);
+}

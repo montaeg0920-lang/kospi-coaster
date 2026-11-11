@@ -217,3 +217,8 @@ button:disabled { opacity: .45; cursor: wait; }
 .safe-probe { position: fixed; left: 0; width: 1px; visibility: hidden; pointer-events: none; }
 #safe-probe-top { top: 0; height: var(--top-inset); }
 #safe-probe-bottom { bottom: 0; height: var(--safe-bottom); }
+
+/* ---------- 누적 점수 ---------- */
+.menu-total { margin: -8px 0 12px; font-size: 14px; color: var(--muted); }
+.menu-total b { color: var(--accent); font-size: 17px; font-variant-numeric: tabular-nums; }
+.res-total { font-size: 15px; font-weight: 800; color: var(--accent); margin: 2px 0 4px; font-variant-numeric: tabular-nums; }

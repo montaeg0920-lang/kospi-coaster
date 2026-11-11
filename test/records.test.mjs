@@ -39,3 +39,19 @@ test('결과 제목: 기절하지 않고 끝까지 타면 완주', () => {
   assert.equal(resultTitle({ fainted: false, score: 120 }), '완주! 🎉');
   assert.equal(resultTitle({ fainted: false, score: 0 }), '무사 도착!');
 });
+
+import { addToTotal } from '../site/src/records.js';
+
+test('누적 점수: 매 탑승 점수를 더해 계속 쌓는다', () => {
+  let total = 0;
+  for (const score of [120, 0, 35.8, 400]) total = addToTotal(total, score);
+  assert.equal(total, 555);
+});
+
+test('누적 점수: 구간을 건너뛴 판과 잘못된 값은 더하지 않는다', () => {
+  assert.equal(addToTotal(100, 50, { seeked: true }), 100);
+  assert.equal(addToTotal(100, -5), 100);
+  assert.equal(addToTotal(100, NaN), 100);
+  assert.equal(addToTotal(undefined, 30), 30);
+  assert.equal(addToTotal('망가진 값', 30), 30);
+});

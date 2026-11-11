@@ -4,7 +4,7 @@ import { RANGES, SERIES_KEY, toPoints, withLatest, selectWindow, summarize, form
 import { H, PHYS, buildTrack, sampleAt, step, toKmh } from './track.js';
 import { applyRules, resultTitle } from './rules.js';
 import { createFeedback } from './feedback.js';
-import { bestKey, staleBestKeys } from './records.js';
+import { bestKey, staleBestKeys, addToTotal, TOTAL_KEY } from './records.js';
 import { shareResult } from './share.js';
 import { LIVE_DATA_URLS, ON_SITE, SHARE_URL } from './config.js';
 import { CHARACTERS, DEFAULT_CHARACTER, characterSrc, cheerSrc, CHEER_PAD, isCharacter, crew } from './characters.js';
@@ -281,6 +281,13 @@ function renderCharacters() {
   }
 }
 
+/** 메뉴의 누적 점수 표시 */
+function renderTotal() {
+  const total = store.get(TOTAL_KEY, 0);
+  $('menu-total').hidden = !(total > 0);
+  $('menu-total-value').textContent = fmtNum(total);
+}
+
 function renderMenu() {
   const historical = !!selectedHistory;
   $('open-history').hidden = historical;
@@ -433,7 +440,19 @@ function finishRide() {
   // 위 그래프로 구간을 건너뛴 탑승은 최고 기록에 넣지 않습니다.
   if (score > prevBest && !ride.seeked) store.set(course.key, score);
   if (!ride.fainted) feedback.event('finish');
-  if (score > 0 && !ride.seeked) platform.submitScore(score); // 앱 안에서는 순위표에 점수를 올립니다
+  // 누적 점수: 매 탑승 점수를 더해 계속 쌓고, 앱 안에서는 토스 순위표에 누적 점수를 올립니다.
+  const prevTotal = store.get(TOTAL_KEY, 0);
+  const total = addToTotal(prevTotal, score, { seeked: ride.seeked });
+  if (total !== prevTotal) {
+    store.set(TOTAL_KEY, total);
+    platform.submitScore(total);
+  }
+  renderTotal();
+  $('res-total').textContent = ride.seeked
+    ? `누적 ${fmtNum(total)}점 · 구간을 건너뛴 판은 더하지 않아요`
+    : score > 0
+      ? `누적 ${fmtNum(total)}점 (+${fmtNum(score)})`
+      : `누적 ${fmtNum(total)}점`;
   const mine = selectedHistory ? '이 코스 최고 기록' : '오늘 최고 기록';
 
   $('res-course').textContent = range.label;
@@ -1194,6 +1213,7 @@ function frame(now) {
 async function boot() {
   for (const key of staleBestKeys(store.keys())) store.remove(key); // 오래된 기록 정리
   renderSound();
+  renderTotal();
   renderCharacters();
   document.documentElement.classList.toggle('can-rank', platform.canRank);
   platform.identify(); // 앱 안에서 사용자 식별값 확인 (게임 로그인)

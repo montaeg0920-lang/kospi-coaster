@@ -66,6 +66,7 @@
   <section id="menu" class="panel" hidden>
     <h1 class="title">KOSPI <span>코스터</span></h1>
     <p class="lead">코스피 그래프가 그대로 레일이 됩니다</p>
+    <p id="menu-total" class="menu-total" hidden>내 누적 점수 <b id="menu-total-value">0</b>점</p>
     <div class="characters" id="characters" role="radiogroup" aria-label="캐릭터 선택"></div>
     <button id="open-history" class="secondary history-entry" type="button">코스피 대상승 대폭락<br>롤러코스터 타기 🎢</button>
     <button id="back-history" class="link" type="button" hidden>← 7개 역사 코스 보기</button>
@@ -106,6 +107,7 @@
     <p id="res-course" class="howto"></p>
     <h2 id="res-title" class="res-title">도착!</h2>
     <div class="res-score"><span id="res-score">0</span><small>점</small></div>
+    <div id="res-total" class="res-total"></div>
     <div id="res-best" class="res-best"></div>
     <dl class="res-grid">
       <div><dt>구간 등락</dt><dd id="res-change">--</dd></div>
