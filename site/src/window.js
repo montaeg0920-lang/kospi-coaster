@@ -9,15 +9,15 @@
 //  - 3달 = 3달 전 같은 날짜·시각부터                 (1시간봉)
 //  - 1년·5년 = 1년·5년 전 같은 날짜부터              (일봉)
 //  - 전체 = 데이터가 있는 처음(1996년 12월)부터      (주봉)
-//  - 5년·전체는 로그 눈금: 같은 % 움직임이 같은 높이가 되어 옛날 폭락·급등도 잘 보입니다.
+//  - 모든 기간은 일반(선형) 눈금: 같은 포인트 변화가 같은 높이 차이가 됩니다.
 
 export const RANGES = [
   { id: '1d', label: '1일', days: 1, series: 'minute' },
   { id: '1w', label: '1주', week: true, series: 'minute', length: 21000 },
   { id: '3m', label: '3달', months: 3, series: 'hourly', length: 21000 },
   { id: '1y', label: '1년', months: 12, series: 'daily', length: 20000 },
-  { id: '5y', label: '5년', months: 60, series: 'daily', length: 21000, log: true },
-  { id: 'all', label: '전체', all: true, series: 'weekly', length: 21000, log: true },
+  { id: '5y', label: '5년', months: 60, series: 'daily', length: 21000 },
+  { id: 'all', label: '전체', all: true, series: 'weekly', length: 21000 },
 ];
 
 /** 데이터 파일의 키 */

@@ -391,7 +391,11 @@ function render(dt) {
   const X = (x) => (x - camX) * sc + sx;
   const Y = (y) => baseY() - y * sc + sy;
 
-  night += ((ride.here.zone === 'tunnel' ? 1 : 0) - night) * Math.min(1, dt * 3);
+  if (course.range.series === 'minute') {
+    night += ((ride.here.zone === 'tunnel' ? 1 : 0) - night) * Math.min(1, dt * 3);
+  } else {
+    night = 0;
+  }
   drawSky(w, h);
   drawSkyline(w, h, sc);
   drawGrid(w, Y);
@@ -430,8 +434,10 @@ const mix = (a, b, f) => a.map((v, i) => Math.round(v + (b[i] - v) * f));
 const rgb = (c) => `rgb(${c[0]},${c[1]},${c[2]})`;
 
 function drawSky(w, h) {
-  // 장 시간에 따라 아침(파랑) → 오후(노을), 밤(터널)은 남색
-  const clock = ride.here.t == null ? 900 : ((ride.here.t % 1440) + 1440) % 1440;
+  // 1일·1주만 시간에 따라 하늘이 변합니다. 장기 코스는 정오의 밝기로 고정합니다.
+  const clock = course.range.series !== 'minute'
+    ? 720
+    : ride.here.t == null ? 900 : ((ride.here.t % 1440) + 1440) % 1440;
   const f = Math.max(0, Math.min(1, (clock - 540) / 390));
   let top = mix([70, 140, 230], [60, 70, 150], f);
   let bot = mix([175, 220, 255], [255, 180, 130], f);
