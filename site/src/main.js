@@ -1,4 +1,4 @@
-import { RANGES, toPoints, selectWindow, summarize, formatT } from './window.js';
+import { RANGES, SERIES_KEY, toPoints, withLatest, selectWindow, summarize, formatT, formatFor, tickOf } from './window.js';
 import { H, PHYS, buildTrack, sampleAt, step, toKmh } from './track.js';
 
 const DATA_URL = 'data/kospi.json';
@@ -97,14 +97,16 @@ function renderDataInfo() {
 
 function rebuildCourse() {
   const range = RANGES.find((r) => r.id === rangeId) ?? RANGES[0];
-  const win = selectWindow(points, range);
-  const stats = summarize(win);
+  // 1일·1주는 1분봉, 3달은 시간봉, 1년·5년은 일봉, 전체는 주봉. 끝은 모두 1분봉의 최신 값(=지금)에 맞춥니다.
+  const series = range.series === 'minute' ? points : withLatest(toPoints(data?.[SERIES_KEY[range.series]]), points.at(-1));
+  const win = selectWindow(series, range);
+  const stats = summarize(win, range);
   if (!stats) {
     course = null;
     renderMenu();
     return;
   }
-  const track = buildTrack(win.points, stats);
+  const track = buildTrack(win.points, stats, { series: range.series, length: range.length, log: !!range.log });
   course = { range, win, stats, track, key: `${range.id}:${win.endT}` };
   miniCache = null;
   if (mode !== 'ride') newRide(true);
@@ -172,13 +174,14 @@ function renderMenu() {
     return;
   }
   const { win, stats } = course;
-  $('win-span').textContent = `${formatT(win.points[0].t)} → ${formatT(win.endT)}`;
+  const s = course.range.series;
+  $('win-span').textContent = `${formatFor(win.points[0].t, s)} → ${formatFor(win.endT, s)}`;
   setChange($('win-change'), stats.changePct);
   $('win-stars').textContent = starText(stats.stars);
   const note = $('win-note');
   if (!win.complete) {
     note.hidden = false;
-    note.textContent = `데이터가 ${stats.sessions}거래일치뿐이라 있는 만큼만 담았어요`;
+    note.textContent = `데이터가 모자라 ${formatFor(win.points[0].t, course.range.series)}부터 있는 만큼만 담았어요`;
   } else note.hidden = true;
   drawChart(preview, { marker: false });
 }
@@ -214,7 +217,7 @@ function finishRide() {
       ? `이 레일 최고 기록 경신! (이전 ${fmtNum(prevBest)}점)`
       : prevBest > 0
         ? `이 레일 최고 기록 ${fmtNum(Math.max(prevBest, score))}점`
-        : `${range.label} 레일 · ${formatT(win.endT)}까지`;
+        : `${range.label} 레일 · ${formatFor(win.endT, range.series)}까지`;
   setChange($('res-change'), stats.changePct);
   $('res-stars').textContent = starText(stats.stars);
   $('res-speed').textContent = `${toKmh(ride.maxV)} km/h`;
@@ -225,7 +228,7 @@ function finishRide() {
 async function share() {
   const { stats, range, win } = course;
   const text = [
-    `🎢 KOSPI 코스터 [${range.label}] ${formatT(win.points[0].t)} → ${formatT(win.endT)}`,
+    `🎢 KOSPI 코스터 [${range.label}] ${formatFor(win.points[0].t, range.series)} → ${formatFor(win.endT, range.series)}`,
     `구간 ${stats.changePct >= 0 ? '▲' : '▼'}${Math.abs(stats.changePct).toFixed(2)}% · 스릴 ${starText(stats.stars)}`,
     `만세 점수 ${fmtNum(ride.score)}점 · 최고 ${toKmh(ride.maxV)}km/h · 최대 ${ride.maxG.toFixed(1)}G${ride.fainted ? ' · 기절 😵' : ''}`,
   ].join('\n');
@@ -479,15 +482,31 @@ function niceStep(raw) {
   return (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * p;
 }
 
+/** 가격 눈금: 보통은 같은 간격, 로그 눈금이면 1·2·5 배수 (500, 1,000, 2,000, 5,000 …) */
+function gridPrices(min, max, log) {
+  const out = [];
+  if (log && max / min > 3) {
+    for (let e = Math.floor(Math.log10(min)); e <= Math.ceil(Math.log10(max)); e++) {
+      for (const m of [1, 2, 5]) {
+        const p = m * 10 ** e;
+        if (p >= min && p <= max) out.push(p);
+      }
+    }
+    return out;
+  }
+  const stepP = niceStep((max - min || 1) / 4);
+  for (let p = Math.ceil(min / stepP) * stepP; p <= max; p += stepP) out.push(p);
+  return out;
+}
+
 function drawGrid(w, Y) {
   const { min, max } = course.stats;
-  const span = max - min || 1;
-  const stepP = niceStep(span / 4);
+  const { norm, log } = course.track;
   ctx.font = '600 11px system-ui, sans-serif';
   ctx.textAlign = 'right';
   ctx.setLineDash([4, 6]);
-  for (let p = Math.ceil(min / stepP) * stepP; p <= max; p += stepP) {
-    const y = Y((H * (p - min)) / span);
+  for (const p of gridPrices(min, max, log)) {
+    const y = Y(H * norm(p));
     ctx.strokeStyle = 'rgba(255,255,255,0.18)';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -586,16 +605,19 @@ function drawLabels(track, ns, i0, i1, X, Y) {
   ctx.textAlign = 'center';
   ctx.font = '700 11px system-ui, sans-serif';
   const gy = Y(GROUND);
-  let lastX = -Infinity;
-  for (let i = i0; i <= i1; i++) {
+  const series = course.range.series;
+  // 눈금이 바뀌는 곳(매시 / 매일 / 매달 / 매년)에 표시합니다.
+  let prevKey = null;
+  for (let i = Math.max(0, i0 - 1); i <= i1; i++) {
     const n = ns[i];
     if (n.zone !== 'main' || n.t == null) continue;
-    const near = Math.round(n.t / 60) * 60;
-    if (Math.abs(n.t - near) > 0.5 || X(n.x) - lastX < 50) continue;
-    lastX = X(n.x);
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.fillRect(X(n.x) - 1, gy, 2, 6);
-    ctx.fillText(formatT(near, { withDate: false }), X(n.x), gy + 18);
+    const tick = tickOf(n.t, series);
+    if (prevKey !== null && tick.key !== prevKey && i >= i0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillRect(X(n.x) - 1, gy, 2, 6);
+      ctx.fillText(tick.label, X(n.x), gy + 18);
+    }
+    prevKey = tick.key;
   }
   // 출발 / 도착 표지
   const start = ns[0];
@@ -722,8 +744,7 @@ function drawChart(c, { marker }) {
   const { track, stats } = course;
   const main = track.nodes.filter((n) => n.zone === 'main' || n.zone === 'tunnel');
   const px = (x) => 6 + (x / track.xEnd) * (w - 12);
-  const span = stats.max - stats.min || 1;
-  const py = (p) => h - 6 - ((p - stats.min) / span) * (h - 12);
+  const py = (p) => h - 6 - track.norm(p) * (h - 12);
   const baseLine = py(stats.first);
 
   if (!marker || !miniCache) {
@@ -784,7 +805,12 @@ function updateHud() {
   if (hudFrame++ % 3) return;
   const { here } = ride;
   $('hud-time').textContent =
-    here.zone === 'tunnel' ? '🌙 장 마감 · 다음 장으로' : here.t == null ? '--' : formatT(Math.round(here.t));
+    here.zone === 'tunnel' ? '🌙 장 마감 · 다음 장으로' : here.t == null
+        ? '--'
+        : course.range.series === 'minute'
+          ? formatT(Math.round(here.t))
+          : // 시간봉·일봉·주봉은 사이 값을 섞지 않고 지나온 봉의 날짜를 보여 줍니다 (주말 날짜가 나오지 않게).
+            formatFor(course.track.nodes[here.i].t ?? here.t, course.range.series);
   $('hud-price').textContent = fmtPrice(here.p);
   setChange($('hud-change'), ((here.p - course.stats.first) / course.stats.first) * 100);
   $('hud-score').textContent = fmtNum(ride.score);

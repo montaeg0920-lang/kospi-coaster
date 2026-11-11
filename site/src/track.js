@@ -17,9 +17,26 @@ export const PHYS = {
 /** km/h 표시용 */
 export const toKmh = (v) => Math.round(v * 0.09);
 
-export function buildTrack(points, stats) {
+/**
+ * @param {object} opts log: 로그 눈금 (5년·전체처럼 몇 배씩 오르내리는 기간)
+ *                      series: 'minute'(1분봉, 밤은 터널) | 'hourly' | 'daily' | 'weekly' (봉 하나 = 한 칸)
+ *                      length: 레일 길이(px). 없으면 1분봉 길이 공식을 씁니다.
+ */
+/** 가격 -> 0~1 높이. log=true면 로그 눈금(같은 % 움직임 = 같은 높이) */
+export function heightScale(stats, log = false) {
+  if (log) {
+    const lo = Math.log(stats.min);
+    const span = Math.log(stats.max) - lo || 1;
+    return (p) => (Math.log(p) - lo) / span;
+  }
   const span = stats.max - stats.min || 1;
-  // 1) 데이터 점마다 "레일 위 분" 좌표를 매깁니다.
+  return (p) => (p - stats.min) / span;
+}
+
+export function buildTrack(points, stats, { series = 'minute', length, log = false } = {}) {
+  const norm = heightScale(stats, log);
+  const intraday = series === 'minute';
+  // 1) 데이터 점마다 "레일 위 칸" 좌표를 매깁니다. 1분봉은 1칸 = 1분, 그 밖에는 봉 하나 = 1칸.
   const marks = [];
   const sessions = [];
   let m = 0;
@@ -27,7 +44,9 @@ export function buildTrack(points, stats) {
     const pt = points[i];
     if (i > 0) {
       const prev = points[i - 1];
-      if (pt.date !== prev.date) {
+      if (!intraday) {
+        m += 1;
+      } else if (pt.date !== prev.date) {
         sessions.push({ m0: m, m1: m + TUNNEL_MIN, date: pt.date, t: pt.t, gap: pt.p - prev.p });
         m += TUNNEL_MIN;
       } else {
@@ -37,9 +56,9 @@ export function buildTrack(points, stats) {
     marks.push({ m, pt });
   }
   const M = Math.max(1, m);
-  const pxPerMin = (BASE_W * Math.sqrt(Math.max(0.35, M / SESSION_MIN))) / M;
+  const pxPerMin = (length ?? BASE_W * Math.sqrt(Math.max(0.35, M / SESSION_MIN))) / M;
 
-  // 2) 1분 간격으로 고르게 다시 뽑기 (선형 보간)
+  // 2) 한 칸 간격으로 고르게 다시 뽑기 (선형 보간)
   const uni = [];
   let j = 0;
   for (let k = 0; k <= M; k++) {
@@ -57,7 +76,7 @@ export function buildTrack(points, stats) {
 
   // 3) 레일 모양은 살짝 다듬기 (이동평균). 가격 표시는 원래 값을 씁니다.
   //    반경을 화면 거리(약 260px)로 정해서, 기간이 길어도 골짜기가 너무 뾰족해지지 않게 합니다.
-  const r = Math.max(4, Math.round(260 / pxPerMin));
+  const r = Math.max(2, Math.round(260 / pxPerMin));
   const blur = (arr) =>
     arr.map((_, i) => {
       let sum = 0;
@@ -70,7 +89,7 @@ export function buildTrack(points, stats) {
       }
       return sum / w;
     });
-  const smooth = blur(blur(uni.map((u) => (H * (u.p - stats.min)) / span)));
+  const smooth = blur(blur(uni.map((u) => H * norm(u.p))));
 
   // 4) 승강장 + 본선 + 감속 구간
   const nodes = [];
@@ -115,6 +134,8 @@ export function buildTrack(points, stats) {
     pxPerMin,
     xEnd,
     stats,
+    norm,
+    log,
   };
 }
 
