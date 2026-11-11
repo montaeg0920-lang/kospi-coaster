@@ -8,11 +8,15 @@ const BRAKE_RUN = 1100; // 도착 감속 구간 길이
 
 export const PHYS = {
   g: 1500,
-  vLift: 420, // 오르막 체인 리프트 속도 (이보다 느려지지 않음)
+  vLift: 600, // 오르막 체인 리프트 기본 속도 (이보다 느려지지 않음). 레일마다 30초 안에 끝나도록 더 올릴 수 있습니다.
   vMax: 2700,
   drag: 0.00007,
   launch: 650,
 };
+
+export const RIDE_LIMIT = 30; // 모든 탑승은 이 시간(초) 안에 끝납니다.
+const RIDE_TARGET = 28; // 화면 프레임 차이를 감안한 여유
+const DT = 1 / 120;
 
 /** km/h 표시용 */
 export const toKmh = (v) => Math.round(v * 0.09);
@@ -125,7 +129,7 @@ export function buildTrack(points, stats, { series = 'minute', length, log = fal
   }
 
   const brakeStart = nodes.find((n) => n.zone === 'brake')?.s ?? s;
-  return {
+  const track = {
     nodes,
     length: s,
     mainStart: 0,
@@ -136,7 +140,38 @@ export function buildTrack(points, stats, { series = 'minute', length, log = fal
     stats,
     norm,
     log,
+    vLift: PHYS.vLift,
   };
+  track.vLift = fitLift(track);
+  return track;
+}
+
+/** 이 레일을 끝까지 타는 데 걸리는 시간(초)을 미리 계산합니다. */
+export function rideTime(track, vLift = track.vLift, limit = 120) {
+  const saved = track.vLift;
+  track.vLift = vLift;
+  const st = { s: 0, v: PHYS.launch };
+  let t = 0;
+  while (t < limit) {
+    const { here } = step(track, st, DT);
+    t += DT;
+    if ((here.zone === 'brake' && st.v <= 45) || st.s >= track.length - 2) break;
+  }
+  track.vLift = saved;
+  return t;
+}
+
+/** 30초 안에 끝나도록 오르막 속도를 정합니다 (기본 속도로 충분하면 그대로). */
+function fitLift(track) {
+  let lo = PHYS.vLift;
+  if (rideTime(track, lo) <= RIDE_TARGET) return lo;
+  let hi = PHYS.vMax;
+  for (let k = 0; k < 12; k++) {
+    const mid = (lo + hi) / 2;
+    if (rideTime(track, mid) <= RIDE_TARGET) hi = mid;
+    else lo = mid;
+  }
+  return hi;
 }
 
 /** 호 길이 s 위치의 레일 정보 (이분 탐색 + 보간) */
@@ -176,7 +211,7 @@ export function step(track, state, dt) {
   if (here.zone === 'station') a = 0;
   state.v += a * dt;
   if (here.zone === 'brake') state.v = Math.max(state.v, 40);
-  else state.v = Math.min(PHYS.vMax, Math.max(PHYS.vLift, state.v));
+  else state.v = Math.min(PHYS.vMax, Math.max(track.vLift ?? PHYS.vLift, state.v));
   state.s += state.v * dt;
   const an = state.v * state.v * here.kappa; // + 방향이면 위로 휘는 곳(눌리는 G)
   return { here, a, an };

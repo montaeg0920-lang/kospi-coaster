@@ -13,11 +13,11 @@
 
 export const RANGES = [
   { id: '1d', label: '1일', days: 1, series: 'minute' },
-  { id: '1w', label: '1주', week: true, series: 'minute' },
-  { id: '3m', label: '3달', months: 3, series: 'hourly', length: 46000 },
-  { id: '1y', label: '1년', months: 12, series: 'daily', length: 40000 },
-  { id: '5y', label: '5년', months: 60, series: 'daily', length: 44000, log: true },
-  { id: 'all', label: '전체', all: true, series: 'weekly', length: 46000, log: true },
+  { id: '1w', label: '1주', week: true, series: 'minute', length: 21000 },
+  { id: '3m', label: '3달', months: 3, series: 'hourly', length: 21000 },
+  { id: '1y', label: '1년', months: 12, series: 'daily', length: 20000 },
+  { id: '5y', label: '5년', months: 60, series: 'daily', length: 21000, log: true },
+  { id: 'all', label: '전체', all: true, series: 'weekly', length: 21000, log: true },
 ];
 
 /** 데이터 파일의 키 */

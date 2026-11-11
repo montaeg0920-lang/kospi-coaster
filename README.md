@@ -22,6 +22,8 @@
 
 - 오르막은 빨강, 내리막은 파랑 (한국 증시 색)
 - 평범한 날도 재미있도록 레일 높이는 그 기간의 최저~최고에 맞춰 늘립니다. 실제 변동폭은 스릴 ★로 보여 줍니다.
+- **모든 탑승은 30초 안에 끝납니다.** 레일을 만들 때 미리 한 번 달려 보고, 30초가 넘으면 그 레일의 오르막 속도를 올립니다
+  (기본 오르막 속도 약 54km/h). 데이터가 매시간 바뀌어도 항상 지켜집니다.
 - 5년·전체는 지수가 몇 배씩 움직여서 로그 눈금을 씁니다. 같은 % 움직임이 같은 높이가 되어, 옛날 폭락·급등도 잘 보입니다.
 
 ## 조작
@@ -59,7 +61,7 @@
 ```bash
 npm run fetch   # 최신 데이터 받기 → site/data/kospi.json
 npm run dev     # http://localhost:5173
-npm test        # 레일 구간 계산 테스트
+npm test        # 기간 규칙 + 30초 제한 테스트
 ```
 
 의존성 설치가 필요 없습니다 (Node 20 이상).
@@ -75,5 +77,6 @@ site/
   data/kospi.json 지수 데이터 (Actions가 매시간 덮어씀)
 scripts/fetch-kospi.mjs  데이터 수집
 scripts/serve.mjs        로컬 서버
-test/window.test.mjs
+test/window.test.mjs   기간 규칙 테스트
+test/track.test.mjs    30초 안에 끝나는지 테스트 (기간별 최악의 레일)
 ```

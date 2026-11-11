@@ -307,7 +307,7 @@ function tick(dt) {
   if (here.zone === 'main') ride.maxG = Math.max(ride.maxG, ride.g);
 
   if (!ride.demo && !ride.fainted && here.zone !== 'station') {
-    const speed = Math.max(0, Math.min(1, (ride.v - PHYS.vLift) / (PHYS.vMax * 0.5)));
+    const speed = Math.max(0, Math.min(1, (ride.v - course.track.vLift) / (PHYS.vMax * 0.5)));
     const force = Math.max(0, Math.min(1, Math.abs(ride.g - 1) / 2.2));
     const thrill = speed * 0.7 + force * 0.3;
     const harsh = Math.max(0, Math.abs(ride.g - 1) - 1.2);
