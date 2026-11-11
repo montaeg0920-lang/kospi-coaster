@@ -1,6 +1,7 @@
 import { HISTORY, historicalWindow, historicalStats } from './history.js';
 import { RANGES, SERIES_KEY, toPoints, withLatest, selectWindow, summarize, formatT, formatFor, tickOf } from './window.js';
 import { H, PHYS, buildTrack, sampleAt, step, toKmh } from './track.js';
+import { applyRules } from './rules.js';
 
 const DATA_URL = 'data/kospi.json';
 const REFRESH_MS = 5 * 60 * 1000; // 데이터 파일은 1시간마다 바뀌고, 화면은 5분마다 확인합니다.
@@ -43,6 +44,7 @@ let ride = null;
 let miniCache = null;
 let particles = [];
 let camX = 0;
+let snapCam = false; // 구간 이동 직후에는 카메라를 바로 옮깁니다
 let shake = 0;
 let night = 0;
 let view = { w: 0, h: 0, dpr: 1 };
@@ -143,6 +145,7 @@ function newRide(demo) {
     here: course ? sampleAt(course.track, 0) : null,
     acc: 0,
     done: false,
+    seeked: false,
   };
   particles = [];
   camX = course ? ride.here.x - viewWorldW() * 0.3 : 0;
@@ -163,6 +166,33 @@ function setMode(next) {
   miniCache = null;
 }
 
+/** 버튼 묶음(기간·배속)을 한 번 만들고, 고른 값을 표시합니다. */
+function renderChoices(box, items, current, onPick) {
+  const signature = items.map(i => i.id).join(',');
+  if (box.dataset.choices !== signature) { box.replaceChildren(); box.dataset.choices = signature; }
+  if (!box.childElementCount) {
+    for (const item of items) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = item.label;
+      b.dataset.id = item.id;
+      b.setAttribute('role', 'radio');
+      b.addEventListener('click', () => onPick(item.id));
+      box.append(b);
+    }
+  }
+  for (const b of box.children) b.setAttribute('aria-checked', String(b.dataset.id === String(current)));
+}
+
+/** 기간 바꾸기 — 메뉴에서는 미리보기만, 탑승 중이면 새 기간으로 바로 다시 출발 */
+function pickRange(id) {
+  rangeId = id;
+  store.set('kc.range', id);
+  if (pending) applyData(pending);
+  else rebuildCourse();
+  if (mode === 'ride') startRide();
+}
+
 function renderMenu() {
   const historical = !!selectedHistory;
   $('open-history').hidden = historical;
@@ -175,23 +205,10 @@ function renderMenu() {
   $('course-description').textContent = selectedHistory?.description ?? '';
   $('to-menu').textContent = historical ? '다른 역사 코스 타기' : '기간 바꾸기';
   renderDataInfo();
-  const box = $('ranges');
-  if (!box.childElementCount) {
-    for (const r of RANGES) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = r.label;
-      b.dataset.id = r.id;
-      b.setAttribute('role', 'radio');
-      b.addEventListener('click', () => {
-        rangeId = r.id;
-        store.set('kc.range', r.id);
-        rebuildCourse();
-      });
-      box.append(b);
-    }
-  }
-  for (const b of box.children) b.setAttribute('aria-checked', String(b.dataset.id === rangeId));
+  renderChoices($('ranges'), RANGES, rangeId, pickRange);
+  const choices = historical ? HISTORY.map((r, i) => ({ ...r, label: ['IMF', '반등', '닷컴', '금융', '코로나', '회복', '2025'][i] })) : RANGES;
+  renderChoices($('hud-ranges'), choices, selectedHistory?.id ?? rangeId, historical ? pickHistory : pickRange);
+  $('hud-ranges').setAttribute('aria-label', historical ? '역사 코스' : '탑승 기간');
 
   $('start').disabled = !course;
   if (!course) {
@@ -225,8 +242,60 @@ function startRide() {
   if (!course) return;
   newRide(false);
   setMode('ride');
-  toast('출발! 🎢 누르고 있으면 만세');
+  renderChoices($('speeds'), SPEEDS, speed, pickSpeed);
+  toast('출발! 🎢 누르고 있으면 만세 · 위 그래프를 눌러 이동');
 }
+
+function exitRide() {
+  dragging = false;
+  if (selectedHistory) { newRide(true); setMode('history'); return; }
+  if (pending) applyData(pending);
+  else newRide(true);
+  setMode('menu');
+}
+
+// ---------------------------------------------------------------- 배속
+
+const SPEEDS = [1, 1.5, 2, 4].map((v) => ({ id: String(v), label: `×${v}` }));
+let speed = SPEEDS.some((s) => s.id === String(store.get('kc.speed'))) ? Number(store.get('kc.speed')) : 1;
+
+function pickSpeed(id) {
+  speed = Number(id);
+  store.set('kc.speed', speed);
+  renderChoices($('speeds'), SPEEDS, speed, pickSpeed);
+}
+
+// ---------------------------------------------------------------- 위 그래프로 이동
+
+let dragging = false;
+
+/** 미니맵의 화면 x 위치로 기차를 옮깁니다. */
+function seekTo(clientX) {
+  if (!course || !ride || mode !== 'ride') return;
+  const { track } = course;
+  const rect = mini.getBoundingClientRect();
+  const f = Math.max(0, Math.min(1, (clientX - rect.left - 6) / Math.max(1, rect.width - 12)));
+  const x = Math.min(track.xEnd - 1, f * track.xEnd);
+  const node = track.nodes[Math.min(track.nodes.length - 1, lowerBound(track.nodes, x))];
+  ride.s = node.s;
+  ride.v = track.vLift;
+  ride.here = sampleAt(track, ride.s);
+  ride.seeked = true;
+  particles = [];
+  snapCam = true;
+}
+
+mini.addEventListener('pointerdown', (e) => {
+  if (mode !== 'ride') return;
+  e.preventDefault();
+  e.stopPropagation();
+  dragging = true;
+  mini.setPointerCapture(e.pointerId);
+  setHands(false);
+  seekTo(e.clientX);
+});
+mini.addEventListener('pointermove', (e) => dragging && seekTo(e.clientX));
+for (const ev of ['pointerup', 'pointercancel']) mini.addEventListener(ev, () => (dragging = false));
 
 function finishRide() {
   ride.done = true;
@@ -234,13 +303,15 @@ function finishRide() {
   const bestKey = `kc.best.${course.key}`;
   const prevBest = store.get(bestKey, 0);
   const score = Math.floor(ride.score);
-  if (score > prevBest) store.set(bestKey, score);
+  // 위 그래프로 구간을 건너뛴 탑승은 최고 기록에 넣지 않습니다.
+  if (score > prevBest && !ride.seeked) store.set(bestKey, score);
 
   $('res-course').textContent = range.label;
   $('res-title').textContent = ride.fainted ? '기절! 😵' : score >= 3000 ? '완주! 🎉' : '도착!';
   $('res-score').textContent = fmtNum(score);
-  $('res-best').textContent =
-    score > prevBest && prevBest > 0
+  $('res-best').textContent = ride.seeked
+    ? '구간을 건너뛰어서 최고 기록에는 넣지 않았어요'
+    : score > prevBest && prevBest > 0
       ? `이 레일 최고 기록 경신! (이전 ${fmtNum(prevBest)}점)`
       : prevBest > 0
         ? `이 레일 최고 기록 ${fmtNum(Math.max(prevBest, score))}점`
@@ -305,12 +376,19 @@ window.addEventListener('contextmenu', (e) => e.preventDefault());
 $('start').addEventListener('click', startRide);
 $('again').addEventListener('click', startRide);
 $('share').addEventListener('click', share);
-$('to-menu').addEventListener('click', () => {
-  if (selectedHistory) { setMode('history'); return; }
-  if (pending) applyData(pending);
-  else newRide(true);
-  setMode('menu');
-});
+$('to-menu').addEventListener('click', exitRide);
+$('hud-exit').addEventListener('click', exitRide);
+window.addEventListener('keydown', (e) => e.code === 'Escape' && mode === 'ride' && exitRide());
+
+function pickHistory(id) {
+  const wasRiding = mode === 'ride';
+  selectedHistory = HISTORY.find(r => r.id === id);
+  if (!wasRiding) setMode('menu');
+  rebuildCourse();
+  if (wasRiding) startRide();
+  resize();
+  $('menu').scrollTop = 0;
+}
 
 async function loadHistory() {
   $('history-status').hidden = false;
@@ -334,9 +412,7 @@ async function loadHistory() {
       const duration = document.createElement('span'); duration.textContent = `${range.duration}초 이내 · 선택하기 →`;
       meta.append(change, duration); button.append(title, desc, dates, meta);
       button.addEventListener('click', () => {
-        selectedHistory = range;
-        setMode('menu'); rebuildCourse(); resize();
-        $('menu').scrollTop = 0;
+        pickHistory(range.id);
       });
       return button;
     });
@@ -362,8 +438,8 @@ $('back-live').addEventListener('click', () => {
 
 function update(dt) {
   if (!course || !ride) return;
-  if (ride.done) return;
-  ride.acc += Math.min(dt, 0.1);
+  if (ride.done || dragging) return; // 위 그래프를 끄는 동안은 멈춤
+  ride.acc += Math.min(dt, 0.1) * (ride.demo ? 1 : speed);
   while (ride.acc >= DT) {
     ride.acc -= DT;
     tick(DT);
@@ -380,25 +456,9 @@ function tick(dt) {
   ride.maxV = Math.max(ride.maxV, ride.v);
   if (here.zone === 'main') ride.maxG = Math.max(ride.maxG, ride.g);
 
-  if (!ride.demo && !ride.fainted && here.zone !== 'station') {
-    const speed = Math.max(0, Math.min(1, (ride.v - course.track.vLift) / (PHYS.vMax * 0.5)));
-    const force = Math.max(0, Math.min(1, Math.abs(ride.g - 1) / 2.2));
-    const thrill = speed * 0.7 + force * 0.3;
-    const harsh = Math.max(0, Math.abs(ride.g - 1) - 1.2);
-    if (ride.hands && here.zone === 'main') {
-      ride.holdT += dt;
-      ride.combo = Math.min(3, 1 + ride.holdT / 4);
-      ride.score += (4 + 260 * thrill * thrill) * ride.combo * dt;
-      ride.nausea += (2 + 40 * thrill + 12 * harsh) * dt;
-    } else {
-      ride.holdT = 0;
-      ride.combo = 1;
-      ride.nausea += (6 * harsh - 15) * dt;
-    }
-    ride.nausea = Math.max(0, ride.nausea);
-    if (ride.nausea >= 100) {
-      ride.nausea = 100;
-      ride.fainted = true;
+  if (!ride.demo) {
+    const info = { ang: here.ang, zone: here.zone, v: ride.v, g: ride.g, vLift: track.vLift, vMax: PHYS.vMax };
+    if (applyRules(ride, info, dt)) {
       setHands(false);
       toast('😵 기절했어요… 끝까지 실려 갑니다');
     }
@@ -459,7 +519,8 @@ function render(dt) {
   }
   const sc = scale();
   const target = ride.here.x - viewWorldW() * 0.3;
-  camX += (target - camX) * Math.min(1, dt * 5);
+  camX = snapCam ? target : camX + (target - camX) * Math.min(1, dt * 5 * (mode === 'ride' ? Math.sqrt(speed) : 1));
+  snapCam = false;
   const sx = (Math.random() - 0.5) * shake;
   const sy = (Math.random() - 0.5) * shake;
   const X = (x) => (x - camX) * sc + sx;
@@ -869,12 +930,19 @@ function drawChart(c, { marker }) {
   if (marker && ride) {
     const x = Math.max(6, Math.min(w - 6, px(Math.max(0, Math.min(track.xEnd, ride.here.x)))));
     const y = py(ride.here.p);
+    // 손가락으로 잡기 쉽게 세로 줄 + 큰 점
+    cx.strokeStyle = 'rgba(255,210,63,0.6)';
+    cx.lineWidth = 2;
+    cx.beginPath();
+    cx.moveTo(x, 0);
+    cx.lineTo(x, h);
+    cx.stroke();
     cx.fillStyle = '#ffd23f';
     cx.beginPath();
-    cx.arc(x, y, 4.5, 0, Math.PI * 2);
+    cx.arc(x, y, dragging ? 8 : 6.5, 0, Math.PI * 2);
     cx.fill();
     cx.strokeStyle = '#1b2440';
-    cx.lineWidth = 1.5;
+    cx.lineWidth = 2;
     cx.stroke();
   }
 }
