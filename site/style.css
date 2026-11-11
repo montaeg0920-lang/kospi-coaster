@@ -59,9 +59,11 @@ html, body {
   background: rgba(0, 0, 0, 0.38); color: var(--text); font: inherit; font-size: 12px; font-weight: 800; cursor: pointer;
 }
 .hud-ranges button[aria-checked="true"], .speeds button[aria-checked="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+/* 나가기: 기간 버튼과 헷갈리지 않게 떨어뜨리고, 글자로 적고, 색을 다르게 */
 .hud-exit {
-  flex: none; width: 36px; height: 32px; border-radius: 8px; border: 1px solid var(--line);
-  background: rgba(0, 0, 0, 0.5); color: var(--text); font-size: 16px; font-weight: 800; cursor: pointer;
+  flex: none; height: 32px; padding: 0 10px; margin-left: 6px; border-radius: 99px;
+  border: 1px solid rgba(255, 255, 255, 0.55); background: rgba(255, 255, 255, 0.92); color: #1b2440;
+  font: inherit; font-size: 12px; font-weight: 800; white-space: nowrap; cursor: pointer;
 }
 .speeds { display: flex; gap: 4px; max-width: 220px; margin-bottom: 10px; pointer-events: auto; }
 
